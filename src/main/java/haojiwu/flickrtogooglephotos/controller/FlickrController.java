@@ -16,6 +16,8 @@ import com.github.scribejava.core.model.OAuth1RequestToken;
 import com.github.scribejava.core.model.OAuth1Token;
 import haojiwu.flickrtogooglephotos.model.*;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,6 +32,8 @@ import java.util.stream.Collectors;
 
 @RestController
 public class FlickrController {
+  Logger logger = LoggerFactory.getLogger(FlickrController.class);
+
   private static final int ALBUMS_PER_PAGE = 5;
   private static final int PHOTOS_PER_PAGE = 500;
 
@@ -90,6 +94,7 @@ public class FlickrController {
     extra.add("geo");
     extra.add("description");
     extra.add("tags");
+    extra.add("media");
 
     int page = start / PHOTOS_PER_PAGE + 1;
     PhotoList<Photo> photos = flickr.getPeopleInterface().getPhotos("me", null, null, null,
@@ -121,11 +126,27 @@ public class FlickrController {
 
       System.out.println(StringUtils.join(photo.getTags().stream().map(Tag::getValue).toArray(),","));
 
-      FlickrPhoto flickrPhoto = new FlickrPhoto(photo.getId(), photo.getUrl(), photo.getOriginalUrl(),
+      String photoUrl = photo.getOriginalUrl();
+      if (photo.getMedia().equals("video")) {
+        photoUrl = photo.getVideoOriginalUrl();
+      }
+
+      FlickrPhoto flickrPhoto = new FlickrPhoto(photo.getId(), photo.getUrl(), photoUrl,
               photo.getTitle(), photo.getDescription(), latitude, longitude,
-              photo.getTags().stream().map(Tag::getValue).collect(Collectors.toList()));
+              photo.getTags().stream().map(Tag::getValue).collect(Collectors.toList()), photo.getMedia());
       flickrPhotos.add(flickrPhoto);
       System.out.println(flickrPhoto.toString());
+      logger.info(photo.getMedia());
+      logger.info(photo.getMediaStatus());
+      if (photo.getOriginalUrl().endsWith(".mp4")) {
+
+
+        logger.info(photo.getVideoOriginalUrl());
+        logger.info(photo.getHdMp4Url());
+        logger.info(photo.getOriginalFormat());
+        logger.info(photo.getSiteMP4Url());
+        logger.info(photo.getMobileMp4Url());
+      }
     }
 
     return new FlickrPhotoList(flickrPhotos, photos.getTotal(), start, photos.size() == photos.getPerPage());

@@ -13,8 +13,10 @@ public class FlickrPhoto {
   private final Float latitude;
   private final Float longitude;
   private final List<String> tags;
+  private final String media;
 
-  public FlickrPhoto(String id, String flickrUrl, String photoUrl, String title, String description, Float latitude, Float longitude, List<String> tags) {
+  public FlickrPhoto(String id, String flickrUrl, String photoUrl, String title,
+                     String description, Float latitude, Float longitude, List<String> tags, String media) {
     this.id = id;
     this.flickrUrl = flickrUrl;
     this.photoUrl = photoUrl;
@@ -23,6 +25,7 @@ public class FlickrPhoto {
     this.latitude = latitude;
     this.longitude = longitude;
     this.tags = tags;
+    this.media = media;
   }
 
   public String getId() {
@@ -57,6 +60,9 @@ public class FlickrPhoto {
     return tags;
   }
 
+  public String getMedia() {
+    return media;
+  }
 
   @Override
   public String toString() {
@@ -69,6 +75,7 @@ public class FlickrPhoto {
             .add("latitude", latitude)
             .add("longitude", longitude)
             .add("tags", tags)
+            .add("media", media)
             .toString();
   }
 }

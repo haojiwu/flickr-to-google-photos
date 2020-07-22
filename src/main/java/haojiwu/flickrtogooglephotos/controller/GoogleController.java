@@ -195,122 +195,143 @@ public class GoogleController {
           logger.info("Don't need t to migrate {}", flickrPhoto.getId());
           continue;
         }
+
+        String filename;
+        String mineType;
+
+        // flickr doesn't provide original video for API download. It will convert to MP4.
+        if (flickrPhoto.getMedia().equals("video")) {
+          filename = flickrPhoto.getId() + ".mp4";
+          mineType = "video/mp4";
+        } else {
+          filename = flickrPhoto.getPhotoUrl().substring(flickrPhoto.getPhotoUrl().lastIndexOf("/"));
+          mineType = "image/png";
+        }
+
+
         InputStream in = new URL(flickrPhoto.getPhotoUrl()).openStream();
-        Path path = Paths.get(photoFolder + "/" + flickrPhoto.getId() + ".jpg");
+        Path path = Paths.get(photoFolder + "/" + filename);
         Files.copy(in, path, StandardCopyOption.REPLACE_EXISTING);
 
-        try {
-          File file = new File(path.toString());
-          final ImageMetadata metadata = Imaging.getMetadata(file);
-          if (metadata instanceof JpegImageMetadata) {
-            final JpegImageMetadata jpegMetadata = (JpegImageMetadata) metadata;
+        if (flickrPhoto.getMedia().equals("photo")) {
+          try {
+            File file = new File(path.toString());
+            final ImageMetadata metadata = Imaging.getMetadata(file);
+            if (metadata instanceof JpegImageMetadata) {
+              final JpegImageMetadata jpegMetadata = (JpegImageMetadata) metadata;
 
-            printTagValue(jpegMetadata,
-                    GpsTagConstants.GPS_TAG_GPS_LATITUDE_REF);
-            printTagValue(jpegMetadata, GpsTagConstants.GPS_TAG_GPS_LATITUDE);
-            printTagValue(jpegMetadata,
-                    GpsTagConstants.GPS_TAG_GPS_LONGITUDE_REF);
-            printTagValue(jpegMetadata, GpsTagConstants.GPS_TAG_GPS_LONGITUDE);
+              printTagValue(jpegMetadata,
+                      GpsTagConstants.GPS_TAG_GPS_LATITUDE_REF);
+              printTagValue(jpegMetadata, GpsTagConstants.GPS_TAG_GPS_LATITUDE);
+              printTagValue(jpegMetadata,
+                      GpsTagConstants.GPS_TAG_GPS_LONGITUDE_REF);
+              printTagValue(jpegMetadata, GpsTagConstants.GPS_TAG_GPS_LONGITUDE);
 
-            final TiffImageMetadata exifMetadata = jpegMetadata.getExif();
-            if (null != exifMetadata) {
-              final TiffImageMetadata.GPSInfo gpsInfo = exifMetadata.getGPS();
-              if (null != gpsInfo) {
-                final String gpsDescription = gpsInfo.toString();
+              final TiffImageMetadata exifMetadata = jpegMetadata.getExif();
+              if (null != exifMetadata) {
+                final TiffImageMetadata.GPSInfo gpsInfo = exifMetadata.getGPS();
+                if (null != gpsInfo) {
+                  final String gpsDescription = gpsInfo.toString();
 
-                final double longitude = gpsInfo.getLongitudeAsDegreesEast();
-                final double latitude = gpsInfo.getLatitudeAsDegreesNorth();
+                  final double longitude = gpsInfo.getLongitudeAsDegreesEast();
+                  final double latitude = gpsInfo.getLatitudeAsDegreesNorth();
 
-                System.out.println("    " + "GPS Description: "
-                        + gpsDescription);
-                System.out.println("    "
-                        + "GPS Longitude (Degrees East): " + longitude);
-                System.out.println("    "
-                        + "GPS Latitude (Degrees North): " + latitude);
+                  System.out.println("    " + "GPS Description: "
+                          + gpsDescription);
+                  System.out.println("    "
+                          + "GPS Longitude (Degrees East): " + longitude);
+                  System.out.println("    "
+                          + "GPS Latitude (Degrees North): " + latitude);
+                }
               }
-            }
 
-            // more specific example of how to manually access GPS values
-            final TiffField gpsLatitudeRefField = jpegMetadata.findEXIFValueWithExactMatch(
-                    GpsTagConstants.GPS_TAG_GPS_LATITUDE_REF);
-            final TiffField gpsLatitudeField = jpegMetadata.findEXIFValueWithExactMatch(
-                    GpsTagConstants.GPS_TAG_GPS_LATITUDE);
-            final TiffField gpsLongitudeRefField = jpegMetadata.findEXIFValueWithExactMatch(
-                    GpsTagConstants.GPS_TAG_GPS_LONGITUDE_REF);
-            final TiffField gpsLongitudeField = jpegMetadata.findEXIFValueWithExactMatch(
-                    GpsTagConstants.GPS_TAG_GPS_LONGITUDE);
-            if (gpsLatitudeRefField != null && gpsLatitudeField != null &&
-                    gpsLongitudeRefField != null &&
-                    gpsLongitudeField != null) {
-              // all of these values are strings.
-              final String gpsLatitudeRef = (String) gpsLatitudeRefField.getValue();
-              final RationalNumber gpsLatitude[] = (RationalNumber[]) (gpsLatitudeField.getValue());
-              final String gpsLongitudeRef = (String) gpsLongitudeRefField.getValue();
-              final RationalNumber gpsLongitude[] = (RationalNumber[]) gpsLongitudeField.getValue();
+              // more specific example of how to manually access GPS values
+              final TiffField gpsLatitudeRefField = jpegMetadata.findEXIFValueWithExactMatch(
+                      GpsTagConstants.GPS_TAG_GPS_LATITUDE_REF);
+              final TiffField gpsLatitudeField = jpegMetadata.findEXIFValueWithExactMatch(
+                      GpsTagConstants.GPS_TAG_GPS_LATITUDE);
+              final TiffField gpsLongitudeRefField = jpegMetadata.findEXIFValueWithExactMatch(
+                      GpsTagConstants.GPS_TAG_GPS_LONGITUDE_REF);
+              final TiffField gpsLongitudeField = jpegMetadata.findEXIFValueWithExactMatch(
+                      GpsTagConstants.GPS_TAG_GPS_LONGITUDE);
+              if (gpsLatitudeRefField != null && gpsLatitudeField != null &&
+                      gpsLongitudeRefField != null &&
+                      gpsLongitudeField != null) {
+                // all of these values are strings.
+                final String gpsLatitudeRef = (String) gpsLatitudeRefField.getValue();
+                final RationalNumber gpsLatitude[] = (RationalNumber[]) (gpsLatitudeField.getValue());
+                final String gpsLongitudeRef = (String) gpsLongitudeRefField.getValue();
+                final RationalNumber gpsLongitude[] = (RationalNumber[]) gpsLongitudeField.getValue();
 
-              final RationalNumber gpsLatitudeDegrees = gpsLatitude[0];
-              final RationalNumber gpsLatitudeMinutes = gpsLatitude[1];
-              final RationalNumber gpsLatitudeSeconds = gpsLatitude[2];
+                final RationalNumber gpsLatitudeDegrees = gpsLatitude[0];
+                final RationalNumber gpsLatitudeMinutes = gpsLatitude[1];
+                final RationalNumber gpsLatitudeSeconds = gpsLatitude[2];
 
-              final RationalNumber gpsLongitudeDegrees = gpsLongitude[0];
-              final RationalNumber gpsLongitudeMinutes = gpsLongitude[1];
-              final RationalNumber gpsLongitudeSeconds = gpsLongitude[2];
+                final RationalNumber gpsLongitudeDegrees = gpsLongitude[0];
+                final RationalNumber gpsLongitudeMinutes = gpsLongitude[1];
+                final RationalNumber gpsLongitudeSeconds = gpsLongitude[2];
 
-              // This will format the gps info like so:
-              //
-              // gpsLatitude: 8 degrees, 40 minutes, 42.2 seconds S
-              // gpsLongitude: 115 degrees, 26 minutes, 21.8 seconds E
-
-              System.out.println("    " + "GPS Latitude: "
-                      + gpsLatitudeDegrees.toDisplayString() + " degrees, "
-                      + gpsLatitudeMinutes.toDisplayString() + " minutes, "
-                      + gpsLatitudeSeconds.toDisplayString() + " seconds "
-                      + gpsLatitudeRef);
-              System.out.println("    " + "GPS Longitude: "
-                      + gpsLongitudeDegrees.toDisplayString() + " degrees, "
-                      + gpsLongitudeMinutes.toDisplayString() + " minutes, "
-                      + gpsLongitudeSeconds.toDisplayString() + " seconds "
-                      + gpsLongitudeRef);
-
-            }
-
-            if ((jpegMetadata.getExif() == null || jpegMetadata.getExif().getGPS() == null)
-                    && flickrPhoto.getLatitude() != null
-                    && flickrPhoto.getLongitude() != null) {
-              TiffOutputSet outputSet = null;
-              // note that exif might be null if no Exif metadata is found.
-              final TiffImageMetadata exif = jpegMetadata.getExif();
-
-              if (null != exif) {
-                // TiffImageMetadata class is immutable (read-only).
-                // TiffOutputSet class represents the Exif data to write.
+                // This will format the gps info like so:
                 //
-                // Usually, we want to update existing Exif metadata by
-                // changing
-                // the values of a few fields, or adding a field.
-                // In these cases, it is easiest to use getOutputSet() to
-                // start with a "copy" of the fields read from the image.
-                outputSet = exif.getOutputSet();
+                // gpsLatitude: 8 degrees, 40 minutes, 42.2 seconds S
+                // gpsLongitude: 115 degrees, 26 minutes, 21.8 seconds E
+
+                System.out.println("    " + "GPS Latitude: "
+                        + gpsLatitudeDegrees.toDisplayString() + " degrees, "
+                        + gpsLatitudeMinutes.toDisplayString() + " minutes, "
+                        + gpsLatitudeSeconds.toDisplayString() + " seconds "
+                        + gpsLatitudeRef);
+                System.out.println("    " + "GPS Longitude: "
+                        + gpsLongitudeDegrees.toDisplayString() + " degrees, "
+                        + gpsLongitudeMinutes.toDisplayString() + " minutes, "
+                        + gpsLongitudeSeconds.toDisplayString() + " seconds "
+                        + gpsLongitudeRef);
+
               }
 
-              if (null == outputSet) {
-                outputSet = new TiffOutputSet();
+              if ((jpegMetadata.getExif() == null || jpegMetadata.getExif().getGPS() == null)
+                      && flickrPhoto.getLatitude() != null
+                      && flickrPhoto.getLongitude() != null) {
+                TiffOutputSet outputSet = null;
+                // note that exif might be null if no Exif metadata is found.
+                final TiffImageMetadata exif = jpegMetadata.getExif();
+
+                if (null != exif) {
+                  // TiffImageMetadata class is immutable (read-only).
+                  // TiffOutputSet class represents the Exif data to write.
+                  //
+                  // Usually, we want to update existing Exif metadata by
+                  // changing
+                  // the values of a few fields, or adding a field.
+                  // In these cases, it is easiest to use getOutputSet() to
+                  // start with a "copy" of the fields read from the image.
+                  outputSet = exif.getOutputSet();
+                }
+
+                if (null == outputSet) {
+                  outputSet = new TiffOutputSet();
+                }
+                outputSet.setGPSInDegrees(flickrPhoto.getLongitude(), flickrPhoto.getLatitude());
+                int filenamePrefixIndex = filename.lastIndexOf(".");
+                String geoTaggedFilename = filename.substring(0, filenamePrefixIndex)
+                        + "_geo_tagged" + filename.substring(filenamePrefixIndex);
+                Path newPath = Paths.get(photoFolder + "/" + geoTaggedFilename);
+                FileOutputStream fileOutputStream = new FileOutputStream(newPath.toString());
+                OutputStream outputStream = new BufferedOutputStream(fileOutputStream);
+                new ExifRewriter().updateExifMetadataLossless(file, outputStream,
+                        outputSet);
+                path = newPath;
               }
-              outputSet.setGPSInDegrees(flickrPhoto.getLongitude(), flickrPhoto.getLatitude());
-              Path newPath = Paths.get(photoFolder + "/" + flickrPhoto.getId() + "_new.jpg");
-              FileOutputStream fileOutputStream = new FileOutputStream(newPath.toString());
-              OutputStream outputStream = new BufferedOutputStream(fileOutputStream);
-              new ExifRewriter().updateExifMetadataLossless(file, outputStream,
-                      outputSet);
-              path = newPath;
+
             }
 
+
+          } catch (ImageReadException | ImageWriteException e) {
+            logger.error("exception", e);
           }
 
-
-        } catch (ImageReadException | ImageWriteException e) {
-          logger.error("exception", e);
         }
+
 
         // Open the file and automatically close it after upload
         try (RandomAccessFile file = new RandomAccessFile(path.toString(), "r")) {
@@ -318,7 +339,7 @@ public class GoogleController {
           UploadMediaItemRequest uploadRequest =
                   UploadMediaItemRequest.newBuilder()
                           // The media type (e.g. "image/png")
-                          .setMimeType("image/png")
+                          .setMimeType(mineType)
                           // The file to upload
                           .setDataFile(file)
                           .build();
@@ -371,17 +392,25 @@ public class GoogleController {
 
       if (!newItems.isEmpty()) {
 
-        Map<String, String> filenameToFlickrPhotoId = flickrPhotos.stream()
-                .collect(Collectors.toMap(FlickrPhoto::getFlickrUrl, FlickrPhoto::getId));
 
-        List<MediaItem> successMediaItems = new ArrayList<>();
+        List<String> successMediaItemIds = new ArrayList<>();
+        List<IdMapping> idMappings = new ArrayList<>();
         BatchCreateMediaItemsResponse response = photosLibraryClient.batchCreateMediaItems(newItems);
-        for (NewMediaItemResult itemsResponse : response.getNewMediaItemResultsList()) {
+        assert (response.getNewMediaItemResultsList().size() == flickrPhotos.size());
+        for (int i = 0; i < response.getNewMediaItemResultsList().size(); i++) {
+          NewMediaItemResult itemsResponse = response.getNewMediaItemResultsList().get(i);
           Status status = itemsResponse.getStatus();
           if (status.getCode() == Code.OK_VALUE) {
             // The item is successfully created in the user's library
             MediaItem createdItem = itemsResponse.getMediaItem();
-            successMediaItems.add(createdItem);
+            FlickrPhoto flickrPhoto = flickrPhotos.get(i);
+            logger.info("createdItem: {}, flickr photo: {}", createdItem, flickrPhoto);
+
+            successMediaItemIds.add(createdItem.getId());
+            if (createdItem.getFilename() != null) {
+              assert (createdItem.getFilename().equals(flickrPhoto.getFlickrUrl()));
+            }
+            idMappings.add(new IdMapping(new FlickrId(flickrUserId, flickrPhoto.getId()), createdItem.getId()));
 
           } else {
             logger.error("fail " + status.getMessage());
@@ -390,17 +419,9 @@ public class GoogleController {
         }
 
 
+        photosLibraryClient.batchAddMediaItemsToAlbum(googleAlbumId, successMediaItemIds);
 
-        photosLibraryClient.batchAddMediaItemsToAlbum(googleAlbumId,
-                successMediaItems.stream()
-                        .map(MediaItem::getId)
-                        .collect(Collectors.toList()));
-        List<IdMapping> idMappings = successMediaItems.stream()
-                .map(mediaItem -> {
-                  String flickrPhotoId = filenameToFlickrPhotoId.get(mediaItem.getFilename());
-                  return new IdMapping(new FlickrId(flickrUserId, flickrPhotoId), mediaItem.getId());
-                })
-                .collect(Collectors.toList());
+        idMappings.forEach(i -> logger.info("idMappings {} {}", i.getFlickrId(), i.getGoogleId()));
         idMappingService.saveOrUpdateAll(idMappings);
 
       }
