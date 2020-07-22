@@ -314,7 +314,7 @@ public class GoogleController {
                 outputSet.setGPSInDegrees(flickrPhoto.getLongitude(), flickrPhoto.getLatitude());
                 int filenamePrefixIndex = filename.lastIndexOf(".");
                 String geoTaggedFilename = filename.substring(0, filenamePrefixIndex)
-                        + "_geo_tagged" + filename.substring(filenamePrefixIndex);
+                        + "_geotagged" + filename.substring(filenamePrefixIndex);
                 Path newPath = Paths.get(photoFolder + "/" + geoTaggedFilename);
                 FileOutputStream fileOutputStream = new FileOutputStream(newPath.toString());
                 OutputStream outputStream = new BufferedOutputStream(fileOutputStream);
