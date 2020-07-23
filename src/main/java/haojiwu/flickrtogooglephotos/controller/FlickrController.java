@@ -1,57 +1,48 @@
 package haojiwu.flickrtogooglephotos.controller;
 
-import com.flickr4java.flickr.Flickr;
 import com.flickr4java.flickr.FlickrException;
-import com.flickr4java.flickr.REST;
-import com.flickr4java.flickr.RequestContext;
 import com.flickr4java.flickr.auth.Auth;
-import com.flickr4java.flickr.auth.AuthInterface;
-import com.flickr4java.flickr.auth.Permission;
 import com.flickr4java.flickr.photos.Photo;
 import com.flickr4java.flickr.photos.PhotoList;
 import com.flickr4java.flickr.photosets.Photoset;
 import com.flickr4java.flickr.photosets.Photosets;
 import com.flickr4java.flickr.tags.Tag;
-import com.github.scribejava.core.model.OAuth1RequestToken;
-import com.github.scribejava.core.model.OAuth1Token;
 import com.google.common.collect.ImmutableSet;
-import haojiwu.flickrtogooglephotos.model.*;
+import haojiwu.flickrtogooglephotos.model.FlickrAlbum;
+import haojiwu.flickrtogooglephotos.model.FlickrAlbumList;
+import haojiwu.flickrtogooglephotos.model.FlickrCredential;
+import haojiwu.flickrtogooglephotos.model.FlickrPhoto;
+import haojiwu.flickrtogooglephotos.model.FlickrPhotoList;
 import haojiwu.flickrtogooglephotos.service.FlickrService;
 import org.apache.commons.lang3.StringEscapeUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
 public class FlickrController {
   private static final Logger logger = LoggerFactory.getLogger(FlickrController.class);
 
-  private static final int ALBUMS_PER_PAGE = 5;
-  private static final int PHOTOS_PER_PAGE = 500;
+  private static final String DEFAULT_ALBUMS_PAGE_SIZE = "5";
 
   private static final Set<String> EXCLUDE_TAGS_PREFIX = ImmutableSet.of(
           "geo:lon=", "geo:lat=", "geotagged");
-
-  @Value("${app.flickr.key}")
-  private String apiKey;
-  @Value("${app.flickr.secret}")
-  private String apiSecret;
-  @Value("${app.host}")
-  private String appHost;
-
-  private final Map<String, OAuth1RequestToken> requestTokenStore = new ConcurrentHashMap<>();
 
   @Autowired
   private FlickrService flickrService;
@@ -124,23 +115,23 @@ public class FlickrController {
 
   @GetMapping("/flickr/allPhotos")
   public FlickrPhotoList getAllPhotos(@RequestParam String token, @RequestParam String secret,
-                                      @RequestParam int start) throws FlickrException {
+                                      @RequestParam int page) throws FlickrException {
 
-    PhotoList<Photo> photos = flickrService.getPhotos(token, secret, start);
+    PhotoList<Photo> photos = flickrService.getPhotos(token, secret, page);
 
     List<FlickrPhoto> flickrPhotos = photos.stream()
             .map(FlickrController::convertPhoto)
             .collect(Collectors.toList());
 
-    return new FlickrPhotoList(flickrPhotos, photos.getTotal(), start, photos.size() == photos.getPerPage());
+    return new FlickrPhotoList(flickrPhotos, photos.getTotal(), page, photos.getPerPage(),photos.size() == photos.getPerPage());
   }
 
   @GetMapping("/flickr/allAlbums")
   public FlickrAlbumList getAllAlbums(@RequestParam String token, @RequestParam String secret, @RequestParam String userId,
-                                      @RequestParam int start,
-                                      @RequestParam(defaultValue = "5") int batchSize) throws FlickrException {
+                                      @RequestParam int page,
+                                      @RequestParam(defaultValue = DEFAULT_ALBUMS_PAGE_SIZE) int pageSize) throws FlickrException {
 
-    Photosets photosets = flickrService.getPhotosets(token, secret, userId, start, batchSize);
+    Photosets photosets = flickrService.getPhotosets(token, secret, userId, page, pageSize);
 
     List<FlickrAlbum> flickrAlbums = new ArrayList<>();
     for (Photoset photoset: photosets.getPhotosets()) {
@@ -159,7 +150,7 @@ public class FlickrController {
 
       flickrAlbums.add(flickrAlbum);
     }
-    return new FlickrAlbumList(flickrAlbums, photosets.getTotal(), start,
+    return new FlickrAlbumList(flickrAlbums, photosets.getTotal(), page, photosets.getPerPage(),
             photosets.getPhotosets().size() == photosets.getPerPage());
   }
 }

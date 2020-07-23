@@ -18,7 +18,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -27,7 +30,7 @@ public class FlickrService {
 
   // max photos per page by Flickr API
   // https://www.flickr.com/services/api/flickr.photosets.getPhotos.html
-  private static final int PHOTOS_PER_PAGE = 500; // max photo per page by Flickr API
+  private static final int PHOTOS_PAGE_SIZE = 500; // max photo per page by Flickr API
 
   private static final Set<String> PHOTO_EXTRA_PARAMETER = ImmutableSet.of(
           "original_format", "geo", "description", "tags", "media");
@@ -70,27 +73,25 @@ public class FlickrService {
     return authInterface.checkToken(accessToken);
   }
 
-  public PhotoList<Photo> getPhotos(String token, String secret, int start) throws FlickrException {
+  public PhotoList<Photo> getPhotos(String token, String secret, int page) throws FlickrException {
     Auth auth = new Auth(Permission.READ, null);
     auth.setToken(token);
     auth.setTokenSecret(secret);
     RequestContext.getRequestContext().setAuth(auth);
 
-    int page = start / PHOTOS_PER_PAGE + 1;
-    logger.info("start to get photo token: {}, start: {}, page: {}", token, start, page);
+    logger.info("start to get photo token: {}, page: {}", token, page);
     return flickr.getPeopleInterface().getPhotos("me", null, null, null,
-            null, null, null, null, PHOTO_EXTRA_PARAMETER, PHOTOS_PER_PAGE, page);
+            null, null, null, null, PHOTO_EXTRA_PARAMETER, PHOTOS_PAGE_SIZE, page);
   }
 
   public Photosets getPhotosets(String token, String secret, String userId,
-                                int start, int batchSize) throws FlickrException {
+                                int page, int pageSize) throws FlickrException {
     Auth auth = new Auth(Permission.READ, null);
     auth.setToken(token);
     auth.setTokenSecret(secret);
     RequestContext.getRequestContext().setAuth(auth);
-    int page = start / batchSize + 1;
-    logger.info("start to get photo set token: {}, start: {}, page: {}, batchSize: {}", token, start, page, batchSize);
-    return flickr.getPhotosetsInterface().getList(userId, batchSize, page, null);
+    logger.info("start to get photo set token: {}, page: {}, pageSize: {}", token, page, pageSize);
+    return flickr.getPhotosetsInterface().getList(userId, pageSize, page, null);
   }
 
   public List<Photo> getAllPhotosInPhotoset(String token, String secret, String photoSetId) throws FlickrException {
@@ -103,7 +104,7 @@ public class FlickrService {
     int page = 1; // flickr page starts from 1
     while (true) {
       logger.info("start to get photos from photo set {} token: {},  page: {}", photoSetId, token, page);
-      PhotoList<Photo> photos = flickr.getPhotosetsInterface().getPhotos(photoSetId, PHOTOS_PER_PAGE, page);
+      PhotoList<Photo> photos = flickr.getPhotosetsInterface().getPhotos(photoSetId, PHOTOS_PAGE_SIZE, page);
       logger.info("photos in photo set {}, page: {}, size: {}, perPage: {}",
               photoSetId, page, photos.size(), photos.getPerPage());
       ret.addAll(photos);

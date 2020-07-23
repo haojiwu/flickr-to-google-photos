@@ -5,13 +5,15 @@ import java.util.List;
 public class FlickrPhotoList {
   private final List<FlickrPhoto> flickrPhotos;
   private final int total;
-  private final int start;
+  private final int page;
+  private final int pageSize;
   private final boolean hasNext;
 
-  public FlickrPhotoList(List<FlickrPhoto> flickrPhotos, int total, int start, boolean hasNext) {
+  public FlickrPhotoList(List<FlickrPhoto> flickrPhotos, int total, int page, int pageSize, boolean hasNext) {
     this.flickrPhotos = flickrPhotos;
     this.total = total;
-    this.start = start;
+    this.page = page;
+    this.pageSize = pageSize;
     this.hasNext = hasNext;
   }
 
@@ -23,8 +25,12 @@ public class FlickrPhotoList {
     return total;
   }
 
-  public int getStart() {
-    return start;
+  public int getPage() {
+    return page;
+  }
+
+  public int getPageSize() {
+    return pageSize;
   }
 
   public boolean isHasNext() {
