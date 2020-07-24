@@ -1,5 +1,6 @@
 package haojiwu.flickrtogooglephotos.controller;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import com.flickr4java.flickr.FlickrException;
 import com.flickr4java.flickr.FlickrRuntimeException;
 import com.flickr4java.flickr.auth.Auth;
@@ -65,7 +66,7 @@ public class FlickrController {
   }
 
   @ResponseStatus(value=HttpStatus.BAD_REQUEST)
-  @ExceptionHandler({IllegalArgumentException.class,FlickrException.class})
+  @ExceptionHandler({IllegalArgumentException.class,FlickrException.class,JsonParseException.class})
   @ResponseBody
   ErrorInfo handleBadRequest(HttpServletRequest req, Exception ex) {
     logger.error("handleBadRequest", ex);

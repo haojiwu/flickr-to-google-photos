@@ -242,11 +242,11 @@ public class GoogleService {
                       .build();
       UploadMediaItemResponse uploadResponse = photosLibraryClient.uploadMediaItem(uploadRequest);
       if (uploadResponse.getError().isPresent()) {
-        logger.error("upload photo fail {}", photoLocalPath, uploadResponse.getError().get().getCause());
+        logger.error("upload photo fail. photoLocalPath: {}", photoLocalPath, uploadResponse.getError().get().getCause());
         throw (ApiException) uploadResponse.getError().get().getCause();
       }
       String uploadToken = uploadResponse.getUploadToken().get();
-
+      logger.info("upload success with uploadToken {}, photoLocalPath: {}", uploadToken, photoLocalPath);
       String itemDescription = buildItemDescription(sourcePhoto);
       return NewMediaItemFactory.createNewMediaItem(uploadToken, sourcePhoto.getFlickrUrl(), itemDescription);
     }

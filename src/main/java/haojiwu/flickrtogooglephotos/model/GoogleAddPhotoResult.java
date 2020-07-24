@@ -17,11 +17,12 @@ public class GoogleAddPhotoResult {
   private final NewMediaItem newMediaItem;
 
   private GoogleAddPhotoResult(Status status, String sourceId,
-                               String error, NewMediaItem newMediaItem) {
+                               String error, NewMediaItem newMediaItem, String googleId) {
     this.status = status;
     this.sourceId = sourceId;
     this.error = error;
     this.newMediaItem = newMediaItem;
+    this.googleId = googleId;
   }
 
   public Status getStatus() {
@@ -78,13 +79,14 @@ public class GoogleAddPhotoResult {
     private final String sourceId;
     private String error;
     private NewMediaItem newMediaItem;
+    private String googleId;
 
     public Builder(String sourceId) {
       this.sourceId = sourceId;
     }
 
     public GoogleAddPhotoResult build() {
-      return new GoogleAddPhotoResult(status, sourceId, error, newMediaItem);
+      return new GoogleAddPhotoResult(status, sourceId, error, newMediaItem, googleId);
     }
 
     public Builder setStatus(Status status) {
@@ -99,6 +101,11 @@ public class GoogleAddPhotoResult {
 
     public Builder setNewMediaItem(NewMediaItem newMediaItem) {
       this.newMediaItem = newMediaItem;
+      return this;
+    }
+
+    public Builder setGoogleId(String googleId) {
+      this.googleId = googleId;
       return this;
     }
   }
