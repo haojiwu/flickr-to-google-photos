@@ -1,10 +1,8 @@
 package haojiwu.flickrtogooglephotos.model;
 
-import com.flickr4java.flickr.tags.Tag;
 import com.google.common.base.MoreObjects;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class FlickrPhoto {
   private final String id;

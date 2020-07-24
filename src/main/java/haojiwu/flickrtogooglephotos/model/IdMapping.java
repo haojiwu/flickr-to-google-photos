@@ -5,22 +5,22 @@ import javax.persistence.*;
 @Entity
 public class IdMapping {
   @EmbeddedId
-  private FlickrId flickrId;
-  private String googleId;
+  private IdMappingKey idMappingKey;
+  private String targetId;
 
   public IdMapping() {
   }
 
-  public IdMapping(FlickrId flickrId, String googleId) {
-    this.flickrId = flickrId;
-    this.googleId = googleId;
+  public IdMapping(IdMappingKey idMappingKey, String targetId) {
+    this.idMappingKey = idMappingKey;
+    this.targetId = targetId;
   }
 
-  public FlickrId getFlickrId() {
-    return flickrId;
+  public IdMappingKey getIdMappingKey() {
+    return idMappingKey;
   }
 
-  public String getGoogleId() {
-    return googleId;
+  public String getTargetId() {
+    return targetId;
   }
 }

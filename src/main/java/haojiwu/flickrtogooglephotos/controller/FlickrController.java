@@ -1,6 +1,7 @@
 package haojiwu.flickrtogooglephotos.controller;
 
 import com.flickr4java.flickr.FlickrException;
+import com.flickr4java.flickr.FlickrRuntimeException;
 import com.flickr4java.flickr.auth.Auth;
 import com.flickr4java.flickr.photos.Photo;
 import com.flickr4java.flickr.photos.PhotoList;
@@ -69,6 +70,14 @@ public class FlickrController {
   ErrorInfo handleBadRequest(HttpServletRequest req, Exception ex) {
     logger.error("handleBadRequest", ex);
     return new ErrorInfo(HttpStatus.BAD_REQUEST, req.getRequestURL().toString(), ex);
+  }
+
+  @ResponseStatus(value=HttpStatus.SERVICE_UNAVAILABLE)
+  @ExceptionHandler({IOException.class, FlickrRuntimeException.class})
+  @ResponseBody
+  ErrorInfo handleServiceUnavailable(HttpServletRequest req, Exception ex) {
+    logger.error("handleServiceUnavailable", ex);
+    return new ErrorInfo(HttpStatus.SERVICE_UNAVAILABLE, req.getRequestURL().toString(), ex);
   }
 
   static FlickrPhoto convertPhoto(Photo photo) {

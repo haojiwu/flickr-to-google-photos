@@ -1,6 +1,6 @@
 package haojiwu.flickrtogooglephotos.service;
 
-import haojiwu.flickrtogooglephotos.model.FlickrId;
+import haojiwu.flickrtogooglephotos.model.IdMappingKey;
 import haojiwu.flickrtogooglephotos.model.IdMapping;
 import haojiwu.flickrtogooglephotos.model.IdMappingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,24 +17,28 @@ public class IdMappingService {
   IdMappingRepository idMappingRepository;
 
 
-  public void saveOrUpdate(String flickrUserId, String flickrEntityId, String googleId) {
-    idMappingRepository.save(new IdMapping(new FlickrId(flickrUserId, flickrEntityId), googleId));
+  public void saveOrUpdate(String userId, String sourceId, String targetId) {
+    idMappingRepository.save(new IdMapping(new IdMappingKey(userId, sourceId), targetId));
   }
 
   public void saveOrUpdateAll(List<IdMapping> idMappings) {
     idMappingRepository.saveAll(idMappings);
   }
 
-  public Optional<IdMapping> findById(String flickrUserId, String flickrEntityId) {
-    return idMappingRepository.findById(new FlickrId(flickrUserId, flickrEntityId));
+  public Optional<IdMapping> findById(String userId, String sourceId) {
+    return idMappingRepository.findById(new IdMappingKey(userId, sourceId));
   }
 
-  public Iterable<IdMapping> findAllByIds(String flickrUserId, List<String> flickrEntityIds) {
-    return idMappingRepository.findAllById(flickrEntityIds.stream()
-            .map(flickrEntityId -> new FlickrId(flickrUserId, flickrEntityId))
+  public Iterable<IdMapping> findAllByIds(String userId, List<String> sourceIds) {
+    return idMappingRepository.findAllById(sourceIds.stream()
+            .map(sourceId -> new IdMappingKey(userId, sourceId))
             .collect(Collectors.toList()));
   }
 
-
+//  public List<String> findAllTargetByIds(String userId, List<String> sourceIds) {
+//    return idMappingRepository.findAllByIdMappingKey(sourceIds.stream()
+//            .map(sourceId -> new IdMappingKey(userId, sourceId))
+//            .collect(Collectors.toList()));
+//  }
 
 }
