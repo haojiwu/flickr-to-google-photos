@@ -3,7 +3,7 @@ package haojiwu.flickrtogooglephotos.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.photos.library.v1.proto.NewMediaItem;
 
-public class GoogleAddPhotoResult {
+public class GoogleCreatePhotoResult {
   public enum Status {
     SUCCESS,
     EXISTING,
@@ -16,8 +16,8 @@ public class GoogleAddPhotoResult {
   private String error;
   private final NewMediaItem newMediaItem;
 
-  private GoogleAddPhotoResult(Status status, String sourceId,
-                               String error, NewMediaItem newMediaItem, String googleId) {
+  private GoogleCreatePhotoResult(Status status, String sourceId,
+                                  String error, NewMediaItem newMediaItem, String googleId) {
     this.status = status;
     this.sourceId = sourceId;
     this.error = error;
@@ -85,8 +85,8 @@ public class GoogleAddPhotoResult {
       this.sourceId = sourceId;
     }
 
-    public GoogleAddPhotoResult build() {
-      return new GoogleAddPhotoResult(status, sourceId, error, newMediaItem, googleId);
+    public GoogleCreatePhotoResult build() {
+      return new GoogleCreatePhotoResult(status, sourceId, error, newMediaItem, googleId);
     }
 
     public Builder setStatus(Status status) {

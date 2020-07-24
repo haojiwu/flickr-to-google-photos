@@ -2,15 +2,11 @@ package haojiwu.flickrtogooglephotos.controller;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.google.api.client.auth.oauth2.TokenResponse;
-import com.google.api.gax.core.FixedCredentialsProvider;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.gax.rpc.ApiException;
-import com.google.auth.oauth2.UserCredentials;
 import com.google.common.collect.Lists;
 import com.google.photos.library.v1.PhotosLibraryClient;
-import com.google.photos.library.v1.PhotosLibrarySettings;
 import com.google.photos.library.v1.proto.*;
-import com.google.photos.library.v1.util.AlbumPositionFactory;
-import com.google.photos.library.v1.util.NewEnrichmentItemFactory;
 import com.google.photos.types.proto.Album;
 import com.google.photos.types.proto.MediaItem;
 import com.google.rpc.Code;
@@ -24,11 +20,8 @@ import org.apache.commons.imaging.Imaging;
 import org.apache.commons.imaging.common.ImageMetadata;
 import org.apache.commons.imaging.formats.jpeg.JpegImageMetadata;
 import org.apache.commons.imaging.formats.jpeg.exif.ExifRewriter;
-import org.apache.commons.imaging.formats.tiff.TiffField;
 import org.apache.commons.imaging.formats.tiff.TiffImageMetadata;
-import org.apache.commons.imaging.formats.tiff.taginfos.TagInfo;
 import org.apache.commons.imaging.formats.tiff.write.TiffOutputSet;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +44,7 @@ import java.util.stream.StreamSupport;
 @RestController
 public class GoogleController {
   Logger logger = LoggerFactory.getLogger(GoogleController.class);
+  private static final int GOOGLE_BATCH_SIZE_MAX = 50;
 
   @Value("${app.google.clientId}")
   private String clientId;
@@ -84,7 +78,7 @@ public class GoogleController {
   }
 
   @ResponseStatus(value=HttpStatus.BAD_REQUEST)
-  @ExceptionHandler({IllegalArgumentException.class, JsonParseException.class})
+  @ExceptionHandler({IllegalArgumentException.class,JsonParseException.class,GoogleJsonResponseException.class})
   @ResponseBody
   ErrorInfo handleBadRequest(HttpServletRequest req, Exception ex) {
     logger.error("handleBadRequest", ex);
@@ -101,10 +95,8 @@ public class GoogleController {
 
 
 
-  Map<String, String> buildExistingSourceIdToGoogleIdMap(String userId, List<FlickrPhoto> sourcePhotos) {
-    Iterable<IdMapping> existingIdMappingIter = idMappingService.findAllByIds(userId, sourcePhotos.stream()
-            .map(FlickrPhoto::getId)
-            .collect(Collectors.toList()));
+  Map<String, String> findSourceIdToGoogleIdMap(String userId, List<String> sourceIds) {
+    Iterable<IdMapping> existingIdMappingIter = idMappingService.findAllByIds(userId, sourceIds);
     return StreamSupport.stream(existingIdMappingIter.spliterator(), false)
             .collect(Collectors.toMap(
                     mapping -> mapping.getIdMappingKey().getSourceId(),
@@ -166,13 +158,13 @@ public class GoogleController {
     return photoLocalPath;
   }
 
-  GoogleAddPhotoResult downloadAndUploadSourcePhoto(PhotosLibraryClient photosLibraryClient,
-                                                    Map<String, String> existingSourceIdToGoogleId, FlickrPhoto sourcePhoto) {
+  GoogleCreatePhotoResult downloadAndUploadSourcePhoto(PhotosLibraryClient photosLibraryClient,
+                                                       Map<String, String> existingSourceIdToGoogleId, FlickrPhoto sourcePhoto) {
     String sourceId = sourcePhoto.getId();
     if (existingSourceIdToGoogleId.containsKey(sourceId)) {
       logger.info("Don't need t to migrate {}", sourceId);
-      return new GoogleAddPhotoResult.Builder(sourceId)
-              .setStatus(GoogleAddPhotoResult.Status.EXISTING)
+      return new GoogleCreatePhotoResult.Builder(sourceId)
+              .setStatus(GoogleCreatePhotoResult.Status.EXISTING)
               .setGoogleId(existingSourceIdToGoogleId.get(sourceId))
               .build();
     }
@@ -186,22 +178,22 @@ public class GoogleController {
       NewMediaItem newMediaItem = googleService.uploadPhotoAndCreateNewMediaItem(
               photosLibraryClient, sourcePhoto, photoLocalPath);
 
-      return new GoogleAddPhotoResult.Builder(sourcePhoto.getId())
-              .setStatus(GoogleAddPhotoResult.Status.SUCCESS)
+      return new GoogleCreatePhotoResult.Builder(sourcePhoto.getId())
+              .setStatus(GoogleCreatePhotoResult.Status.SUCCESS)
               .setNewMediaItem(newMediaItem)
               .build();
     } catch (Exception e) {
       logger.error("Error when adding photo: {}", sourcePhoto.getId(), e);
-      return new GoogleAddPhotoResult.Builder(sourcePhoto.getId())
-              .setStatus(GoogleAddPhotoResult.Status.ERROR)
+      return new GoogleCreatePhotoResult.Builder(sourcePhoto.getId())
+              .setStatus(GoogleCreatePhotoResult.Status.ERROR)
               .setError(e.getMessage())
               .build();
     }
   }
 
-  void createMediaItems(PhotosLibraryClient photosLibraryClient, String userId, List<GoogleAddPhotoResult> results) {
-    List<GoogleAddPhotoResult> resultsWithNewItems = results.stream()
-            .filter(GoogleAddPhotoResult::hasNewMediaItem)
+  void createMediaItems(PhotosLibraryClient photosLibraryClient, String userId, List<GoogleCreatePhotoResult> results) {
+    List<GoogleCreatePhotoResult> resultsWithNewItems = results.stream()
+            .filter(GoogleCreatePhotoResult::hasNewMediaItem)
             .collect(Collectors.toList());
 
     if (resultsWithNewItems.isEmpty()) {
@@ -210,12 +202,12 @@ public class GoogleController {
     }
 
     BatchCreateMediaItemsResponse response = photosLibraryClient.batchCreateMediaItems(resultsWithNewItems.stream()
-            .map(GoogleAddPhotoResult::getNewMediaItem)
+            .map(GoogleCreatePhotoResult::getNewMediaItem)
             .collect(Collectors.toList()));
     assert (response.getNewMediaItemResultsList().size() == resultsWithNewItems.size());
     for (int i = 0; i < response.getNewMediaItemResultsList().size(); i++) {
       NewMediaItemResult itemsResponse = response.getNewMediaItemResultsList().get(i);
-      GoogleAddPhotoResult result = resultsWithNewItems.get(i);
+      GoogleCreatePhotoResult result = resultsWithNewItems.get(i);
       Status status = itemsResponse.getStatus();
       if (status.getCode() == Code.OK_VALUE) {
         MediaItem mediaItem = itemsResponse.getMediaItem();
@@ -224,18 +216,18 @@ public class GoogleController {
         result.setUrl(mediaItem.getProductUrl());
       } else {
         logger.error("fail to create mediaItem, error: {}, source id: {}", status.getMessage(), result.getSourceId());
-        result.setStatus(GoogleAddPhotoResult.Status.ERROR);
+        result.setStatus(GoogleCreatePhotoResult.Status.ERROR);
         result.setError(status.getMessage());
       }
     }
   }
 
   void updateDefaultAlbumAndIdMapping(PhotosLibraryClient photosLibraryClient,
-                                      String userId, String source, List<GoogleAddPhotoResult> results) {
+                                      String userId, String source, List<GoogleCreatePhotoResult> results) {
 
-    List<GoogleAddPhotoResult> resultWithNewCreatedMediaItem = results.stream()
-            .filter(GoogleAddPhotoResult::hasNewMediaItem)
-            .filter(GoogleAddPhotoResult::hasGoogleId)
+    List<GoogleCreatePhotoResult> resultWithNewCreatedMediaItem = results.stream()
+            .filter(GoogleCreatePhotoResult::hasNewMediaItem)
+            .filter(GoogleCreatePhotoResult::hasGoogleId)
             .collect(Collectors.toList());
 
     if (resultWithNewCreatedMediaItem.isEmpty()) {
@@ -248,7 +240,7 @@ public class GoogleController {
     logger.info("add {} new uploaded photo to default album {}", resultWithNewCreatedMediaItem.size(), defaultAlbumId);
     photosLibraryClient.batchAddMediaItemsToAlbum(defaultAlbumId,
             resultWithNewCreatedMediaItem.stream()
-                    .map(GoogleAddPhotoResult::getGoogleId)
+                    .map(GoogleCreatePhotoResult::getGoogleId)
                     .collect(Collectors.toList()));
 
     idMappingService.saveOrUpdateAll(
@@ -260,10 +252,10 @@ public class GoogleController {
 
 
   @PostMapping("/google/photos")
-  public List<GoogleAddPhotoResult> addPhotos(@RequestBody List<FlickrPhoto> sourcePhotos, @RequestParam String refreshToken,
-                        @RequestParam(defaultValue = "Flickr") String source) throws IOException {
-    if (sourcePhotos.size() > 50) {
-      throw new IllegalArgumentException("Google Photo API only accept 50 photos in each batch");
+  public List<GoogleCreatePhotoResult> createPhotos(@RequestBody List<FlickrPhoto> sourcePhotos, @RequestParam String refreshToken,
+                                                 @RequestParam(defaultValue = "Flickr") String source) throws IOException {
+    if (sourcePhotos.size() > GOOGLE_BATCH_SIZE_MAX) {
+      throw new IllegalArgumentException("Google Photo API only accept " + GOOGLE_BATCH_SIZE_MAX + " photos in each batch");
     }
 
     if (!source.equals("Flickr")) {
@@ -272,9 +264,12 @@ public class GoogleController {
 
     PhotosLibraryClient photosLibraryClient = googleService.getPhotosLibraryClient(refreshToken);
     String userId = googleService.getUserId(refreshToken);
-    Map<String, String> existingSourceIdToGoogleId = buildExistingSourceIdToGoogleIdMap(userId, sourcePhotos);
+    Map<String, String> existingSourceIdToGoogleId = findSourceIdToGoogleIdMap(userId,
+            sourcePhotos.stream()
+                    .map(FlickrPhoto::getId)
+                    .collect(Collectors.toList()));
 
-    List<GoogleAddPhotoResult> results = sourcePhotos.stream()
+    List<GoogleCreatePhotoResult> results = sourcePhotos.stream()
             .map(sourcePhoto -> downloadAndUploadSourcePhoto(photosLibraryClient, existingSourceIdToGoogleId, sourcePhoto))
             .collect(Collectors.toList());
 
@@ -283,73 +278,39 @@ public class GoogleController {
     return results;
   }
 
-  @PostMapping("/google/addAlbum")
-  public void addAlbum(@RequestBody FlickrAlbum flickrAlbum, @RequestParam String refreshToken,
-                       @RequestParam String flickrUserId) throws IOException {
-
-    UserCredentials userCredentials = UserCredentials.newBuilder()
-            .setClientId(clientId)
-            .setClientSecret(clientSecret)
-            //.setAccessToken(new AccessToken(accessToken, null))
-            .setRefreshToken(refreshToken)
-            .build();
-
-    PhotosLibrarySettings settings =
-            PhotosLibrarySettings.newBuilder()
-                    .setCredentialsProvider(
-                            FixedCredentialsProvider.create(userCredentials))
-                    .build();
-
-    try (PhotosLibraryClient photosLibraryClient =
-                 PhotosLibraryClient.initialize(settings)) {
-
-//      Album.Builder albumBuilder = Album.newBuilder()
-//              .setTitle(flickrAlbum.getTitle());
-//      idMappingService.findById(flickrUserId, flickrAlbum.getCoverPhotoId())
-//              .map(IdMapping::getGoogleId)
-//              .ifPresent(albumBuilder::setCoverPhotoMediaItemId);
-//      Album googleAlbum = albumBuilder.build();
-
-      Album googleAlbum = photosLibraryClient.createAlbum(flickrAlbum.getTitle());
-
-
-      String textEnrichment = "";
-      if (StringUtils.isNotBlank(flickrAlbum.getDescription())) {
-        textEnrichment += flickrAlbum.getDescription() + "\n";
-      }
-      textEnrichment += flickrAlbum.getUrl();
-      NewEnrichmentItem newEnrichmentItem =
-              NewEnrichmentItemFactory.createTextEnrichment(textEnrichment);
-      AlbumPosition albumPosition = AlbumPositionFactory.createFirstInAlbum();
-      photosLibraryClient.addEnrichmentToAlbum(googleAlbum.getId(), newEnrichmentItem, albumPosition);
-
-      Iterable<IdMapping> googlePhotoIdsIter = idMappingService.findAllByIds(flickrUserId, flickrAlbum.getPhotoIds());
-      Map<String, String> flickrPhotoIdToGooglePhotoId = StreamSupport.stream(googlePhotoIdsIter.spliterator(), false)
-              .collect(Collectors.toMap(m -> m.getIdMappingKey().getSourceId(), IdMapping::getTargetId));
-
-      List<String> googlePhotoIds = flickrAlbum.getPhotoIds().stream()
-              .map(flickrPhotoIdToGooglePhotoId::get)
-              .filter(Objects::nonNull)
-              .collect(Collectors.toList());
-      for (List<String> googlePhotoIdsPart: Lists.partition(googlePhotoIds, 4)) {
-        logger.info("Start to batchAddMediaItemsToAlbum {}", googlePhotoIdsPart.size());
-        photosLibraryClient.batchAddMediaItemsToAlbum(googleAlbum.getId(), googlePhotoIdsPart);
-      }
-
-      logger.info("googleAlbum id {}", googleAlbum.getId());
-      idMappingService.findById(flickrUserId, flickrAlbum.getCoverPhotoId())
-              .map(IdMapping::getTargetId)
-              .ifPresent(googleCoverPhotoId -> {
-                        logger.info("googleCoverPhotoId {}", googleCoverPhotoId);
-                        photosLibraryClient.updateAlbumCoverPhoto(googleAlbum, googleCoverPhotoId);
-                      }
-              );
-
-    } catch (ApiException e) {
-      logger.error("exception 3", e);
-      // Error during album creation
+  @PostMapping("/google/album")
+  public GoogleCreateAlbumResult createAlbum(@RequestBody FlickrAlbum sourceAlbum, @RequestParam String refreshToken,
+                       @RequestParam(defaultValue = "Flickr") String source) throws IOException {
+    if (!source.equals("Flickr")) {
+      throw new IllegalArgumentException("We only support Flickr as photo source for now");
     }
 
+    PhotosLibraryClient photosLibraryClient = googleService.getPhotosLibraryClient(refreshToken);
+    String userId = googleService.getUserId(refreshToken);
+
+    logger.info("start to create google album from source album id: {}", sourceAlbum.getId());
+    Album googleAlbum = googleService.createAlbum(photosLibraryClient, sourceAlbum);
+
+    Map<String, String> sourcePhotoIdToGooglePhotoId = findSourceIdToGoogleIdMap(userId, sourceAlbum.getPhotoIds());
+    List<String> googlePhotoIds = sourceAlbum.getPhotoIds().stream()
+            .map(sourcePhotoIdToGooglePhotoId::get)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+    int batchNum = 0;
+    for (List<String> googlePhotoIdsBatch: Lists.partition(googlePhotoIds, GOOGLE_BATCH_SIZE_MAX)) {
+      logger.info("Start to batchAddMediaItemsToAlbum. album id: {}, size: {}, batch: {}",
+              googleAlbum.getId(), googlePhotoIdsBatch.size(), batchNum);
+      photosLibraryClient.batchAddMediaItemsToAlbum(googleAlbum.getId(), googlePhotoIdsBatch);
+      batchNum++;
+    }
+
+    String coverGooglePhotoId = sourcePhotoIdToGooglePhotoId.get(sourceAlbum.getCoverPhotoId());
+    if (coverGooglePhotoId != null) {
+      logger.info("start to update album cover,  album id: {}, cover id: {}", googleAlbum.getId(), coverGooglePhotoId);
+      photosLibraryClient.updateAlbumCoverPhoto(googleAlbum, coverGooglePhotoId);
+    }
+
+    return new GoogleCreateAlbumResult(googleAlbum.getId(), googleAlbum.getProductUrl(), googlePhotoIds.size());
   }
 
 }

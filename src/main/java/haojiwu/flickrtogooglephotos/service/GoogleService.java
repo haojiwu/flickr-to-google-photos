@@ -1,5 +1,6 @@
 package haojiwu.flickrtogooglephotos.service;
 
+import com.flickr4java.flickr.Flickr;
 import com.flickr4java.flickr.FlickrException;
 import com.flickr4java.flickr.auth.Auth;
 import com.flickr4java.flickr.auth.AuthInterface;
@@ -23,12 +24,17 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.photos.library.v1.PhotosLibraryClient;
 import com.google.photos.library.v1.PhotosLibrarySettings;
+import com.google.photos.library.v1.proto.AlbumPosition;
+import com.google.photos.library.v1.proto.NewEnrichmentItem;
 import com.google.photos.library.v1.proto.NewMediaItem;
 import com.google.photos.library.v1.upload.UploadMediaItemRequest;
 import com.google.photos.library.v1.upload.UploadMediaItemResponse;
+import com.google.photos.library.v1.util.AlbumPositionFactory;
+import com.google.photos.library.v1.util.NewEnrichmentItemFactory;
 import com.google.photos.library.v1.util.NewMediaItemFactory;
 import com.google.photos.types.proto.Album;
 import com.google.photos.types.proto.MediaItem;
+import haojiwu.flickrtogooglephotos.model.FlickrAlbum;
 import haojiwu.flickrtogooglephotos.model.FlickrPhoto;
 import haojiwu.flickrtogooglephotos.model.GoogleCredential;
 import haojiwu.flickrtogooglephotos.model.IdMapping;
@@ -221,6 +227,7 @@ public class GoogleService {
             .collect(Collectors.joining(" ")));
     return itemDescription.toString();
   }
+
   public NewMediaItem uploadPhotoAndCreateNewMediaItem(PhotosLibraryClient photosLibraryClient,
                                                        FlickrPhoto sourcePhoto,
                                                        String photoLocalPath) throws IOException {
@@ -250,6 +257,25 @@ public class GoogleService {
       String itemDescription = buildItemDescription(sourcePhoto);
       return NewMediaItemFactory.createNewMediaItem(uploadToken, sourcePhoto.getFlickrUrl(), itemDescription);
     }
+  }
+
+  static String buildAlbumDescription(FlickrAlbum sourceAlbum) {
+    StringBuilder albumDescription = new StringBuilder();
+    if (StringUtils.isNotBlank(sourceAlbum.getDescription())) {
+      albumDescription.append(sourceAlbum.getDescription()).append("\n");
+    }
+    albumDescription.append(sourceAlbum.getUrl());
+    return albumDescription.toString();
+  }
+
+  public Album createAlbum(PhotosLibraryClient photosLibraryClient, FlickrAlbum sourceAlbum) {
+    Album googleAlbum = photosLibraryClient.createAlbum(sourceAlbum.getTitle());
+
+    NewEnrichmentItem newEnrichmentItem =
+            NewEnrichmentItemFactory.createTextEnrichment(buildAlbumDescription(sourceAlbum));
+    AlbumPosition albumPosition = AlbumPositionFactory.createFirstInAlbum();
+    photosLibraryClient.addEnrichmentToAlbum(googleAlbum.getId(), newEnrichmentItem, albumPosition);
+    return googleAlbum;
   }
 
 }
