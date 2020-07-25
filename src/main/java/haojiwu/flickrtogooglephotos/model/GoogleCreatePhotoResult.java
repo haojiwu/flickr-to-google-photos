@@ -6,8 +6,9 @@ import com.google.photos.library.v1.proto.NewMediaItem;
 public class GoogleCreatePhotoResult {
   public enum Status {
     SUCCESS,
-    EXISTING,
-    ERROR
+    EXIST_NO_NEED_TO_CREATE,
+    EXIST_CAN_NOT_CREATE,
+    FAIL
   }
   private Status status;
   private final String sourceId;

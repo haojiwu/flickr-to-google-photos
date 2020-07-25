@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.gax.rpc.ApiException;
+import com.google.api.gax.rpc.InvalidArgumentException;
 import com.google.common.collect.Lists;
 import com.google.photos.library.v1.PhotosLibraryClient;
 import com.google.photos.library.v1.proto.*;
@@ -22,6 +23,7 @@ import org.apache.commons.imaging.formats.jpeg.JpegImageMetadata;
 import org.apache.commons.imaging.formats.jpeg.exif.ExifRewriter;
 import org.apache.commons.imaging.formats.tiff.TiffImageMetadata;
 import org.apache.commons.imaging.formats.tiff.write.TiffOutputSet;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -78,7 +80,7 @@ public class GoogleController {
   }
 
   @ResponseStatus(value=HttpStatus.BAD_REQUEST)
-  @ExceptionHandler({IllegalArgumentException.class,JsonParseException.class,GoogleJsonResponseException.class})
+  @ExceptionHandler({IllegalArgumentException.class,JsonParseException.class,GoogleJsonResponseException.class,InvalidArgumentException.class})
   @ResponseBody
   ErrorInfo handleBadRequest(HttpServletRequest req, Exception ex) {
     logger.error("handleBadRequest", ex);
@@ -164,7 +166,7 @@ public class GoogleController {
     if (existingSourceIdToGoogleId.containsKey(sourceId)) {
       logger.info("Don't need t to migrate {}", sourceId);
       return new GoogleCreatePhotoResult.Builder(sourceId)
-              .setStatus(GoogleCreatePhotoResult.Status.EXISTING)
+              .setStatus(GoogleCreatePhotoResult.Status.EXIST_NO_NEED_TO_CREATE)
               .setGoogleId(existingSourceIdToGoogleId.get(sourceId))
               .build();
     }
@@ -185,7 +187,7 @@ public class GoogleController {
     } catch (Exception e) {
       logger.error("Error when adding photo: {}", sourcePhoto.getId(), e);
       return new GoogleCreatePhotoResult.Builder(sourcePhoto.getId())
-              .setStatus(GoogleCreatePhotoResult.Status.ERROR)
+              .setStatus(GoogleCreatePhotoResult.Status.FAIL)
               .setError(e.getMessage())
               .build();
     }
@@ -214,9 +216,24 @@ public class GoogleController {
         logger.info("success create mediaItem: id {}, source id: {}", mediaItem.getId(), result.getSourceId());
         result.setGoogleId(mediaItem.getId());
         result.setUrl(mediaItem.getProductUrl());
+        // Google Photos can upload the same (in terms of checksum, including exif) photo again and only keep one media item.
+        // If use already upload it, our app can upload successfully, but the media item data will not be overwritten.
+        // Also, our app can't add this photo to any album we created.
+        // Therefore we need to assign different return status for this photo.
+        // For photo, we compare filename in media item with from input (flickr url) to know if we need to assign
+        // EXIST_CAN_NOT_CREATE status
+        // For video, filename in media item will be empty. We can't handle this case.
+        // However, since flickr doesn't support download original video by API, and after encoding MP4 file should
+        // have different checksum since nobody know the parameter flickr used to encode MP4, video file should not suffer this issue.
+        if (StringUtils.isNotBlank(mediaItem.getFilename())
+                && !mediaItem.getFilename().equals(result.getNewMediaItem().getSimpleMediaItem().getFileName())) {
+          logger.info("mediaItem was uploaded by user. mediaItem filename {} is not equal to input {}",
+                  mediaItem.getFilename(), result.getNewMediaItem().getSimpleMediaItem().getFileName());
+          result.setStatus(GoogleCreatePhotoResult.Status.EXIST_CAN_NOT_CREATE);
+        }
       } else {
         logger.error("fail to create mediaItem, error: {}, source id: {}", status.getMessage(), result.getSourceId());
-        result.setStatus(GoogleCreatePhotoResult.Status.ERROR);
+        result.setStatus(GoogleCreatePhotoResult.Status.FAIL);
         result.setError(status.getMessage());
       }
     }
@@ -225,26 +242,25 @@ public class GoogleController {
   void updateDefaultAlbumAndIdMapping(PhotosLibraryClient photosLibraryClient,
                                       String userId, String source, List<GoogleCreatePhotoResult> results) {
 
-    List<GoogleCreatePhotoResult> resultWithNewCreatedMediaItem = results.stream()
-            .filter(GoogleCreatePhotoResult::hasNewMediaItem)
-            .filter(GoogleCreatePhotoResult::hasGoogleId)
+    List<GoogleCreatePhotoResult> resultWithSuccessStatus = results.stream()
+            .filter(r -> r.getStatus() == GoogleCreatePhotoResult.Status.SUCCESS)
             .collect(Collectors.toList());
 
-    if (resultWithNewCreatedMediaItem.isEmpty()) {
+    if (resultWithSuccessStatus.isEmpty()) {
       logger.info("Not media item to add default album and update id mapping. userId: {}", userId);
       return;
     }
 
     String defaultAlbumId = googleService.getDefaultAlbumId(photosLibraryClient, userId, source);
 
-    logger.info("add {} new uploaded photo to default album {}", resultWithNewCreatedMediaItem.size(), defaultAlbumId);
+    logger.info("add {} new uploaded photo to default album {}", resultWithSuccessStatus.size(), defaultAlbumId);
     photosLibraryClient.batchAddMediaItemsToAlbum(defaultAlbumId,
-            resultWithNewCreatedMediaItem.stream()
+            resultWithSuccessStatus.stream()
                     .map(GoogleCreatePhotoResult::getGoogleId)
                     .collect(Collectors.toList()));
 
     idMappingService.saveOrUpdateAll(
-            resultWithNewCreatedMediaItem.stream()
+            resultWithSuccessStatus.stream()
                     .map(r -> new IdMapping(new IdMappingKey(userId, r.getSourceId()), r.getGoogleId()))
                     .collect(Collectors.toList()));
   }
