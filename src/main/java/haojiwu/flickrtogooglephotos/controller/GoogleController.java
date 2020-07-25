@@ -7,12 +7,20 @@ import com.google.api.gax.rpc.ApiException;
 import com.google.api.gax.rpc.InvalidArgumentException;
 import com.google.common.collect.Lists;
 import com.google.photos.library.v1.PhotosLibraryClient;
-import com.google.photos.library.v1.proto.*;
+import com.google.photos.library.v1.proto.BatchCreateMediaItemsResponse;
+import com.google.photos.library.v1.proto.NewMediaItem;
+import com.google.photos.library.v1.proto.NewMediaItemResult;
 import com.google.photos.types.proto.Album;
 import com.google.photos.types.proto.MediaItem;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
-import haojiwu.flickrtogooglephotos.model.*;
+import haojiwu.flickrtogooglephotos.model.FlickrAlbum;
+import haojiwu.flickrtogooglephotos.model.FlickrPhoto;
+import haojiwu.flickrtogooglephotos.model.GoogleCreateAlbumResult;
+import haojiwu.flickrtogooglephotos.model.GoogleCreatePhotoResult;
+import haojiwu.flickrtogooglephotos.model.GoogleCredential;
+import haojiwu.flickrtogooglephotos.model.IdMapping;
+import haojiwu.flickrtogooglephotos.model.IdMappingKey;
 import haojiwu.flickrtogooglephotos.service.GoogleService;
 import haojiwu.flickrtogooglephotos.service.IdMappingService;
 import org.apache.commons.imaging.ImageReadException;
@@ -29,17 +37,31 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.*;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -48,12 +70,6 @@ public class GoogleController {
   Logger logger = LoggerFactory.getLogger(GoogleController.class);
   private static final int GOOGLE_BATCH_SIZE_MAX = 50;
 
-  @Value("${app.google.clientId}")
-  private String clientId;
-  @Value("${app.google.clientSecret}")
-  private String clientSecret;
-  @Value("${app.host}")
-  private String appHost;
   @Value("${app.photoFolder}")
   private String photoFolder;
 
@@ -94,8 +110,6 @@ public class GoogleController {
     logger.error("handleServiceUnavailable", ex);
     return new ErrorInfo(HttpStatus.SERVICE_UNAVAILABLE, req.getRequestURL().toString(), ex);
   }
-
-
 
   Map<String, String> findSourceIdToGoogleIdMap(String userId, List<String> sourceIds) {
     Iterable<IdMapping> existingIdMappingIter = idMappingService.findAllByIds(userId, sourceIds);
@@ -267,9 +281,9 @@ public class GoogleController {
 
 
 
-  @PostMapping("/google/photos")
+  @PostMapping("/google/photo")
   public List<GoogleCreatePhotoResult> createPhotos(@RequestBody List<FlickrPhoto> sourcePhotos, @RequestParam String refreshToken,
-                                                 @RequestParam(defaultValue = "Flickr") String source) throws IOException {
+                                                    @RequestParam(defaultValue = "Flickr") String source) throws IOException {
     if (sourcePhotos.size() > GOOGLE_BATCH_SIZE_MAX) {
       throw new IllegalArgumentException("Google Photo API only accept " + GOOGLE_BATCH_SIZE_MAX + " photos in each batch");
     }
@@ -296,7 +310,7 @@ public class GoogleController {
 
   @PostMapping("/google/album")
   public GoogleCreateAlbumResult createAlbum(@RequestBody FlickrAlbum sourceAlbum, @RequestParam String refreshToken,
-                       @RequestParam(defaultValue = "Flickr") String source) throws IOException {
+                                             @RequestParam(defaultValue = "Flickr") String source) throws IOException {
     if (!source.equals("Flickr")) {
       throw new IllegalArgumentException("We only support Flickr as photo source for now");
     }

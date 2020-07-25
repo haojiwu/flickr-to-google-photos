@@ -123,7 +123,7 @@ public class FlickrController {
   }
 
 
-  @GetMapping("/flickr/allPhotos")
+  @GetMapping("/flickr/photo")
   public FlickrPhotoList getAllPhotos(@RequestParam String token, @RequestParam String secret,
                                       @RequestParam int page) throws FlickrException {
 
@@ -136,7 +136,7 @@ public class FlickrController {
     return new FlickrPhotoList(flickrPhotos, photos.getTotal(), page, photos.getPerPage(),photos.size() == photos.getPerPage());
   }
 
-  @GetMapping("/flickr/allAlbums")
+  @GetMapping("/flickr/album")
   public FlickrAlbumList getAllAlbums(@RequestParam String token, @RequestParam String secret, @RequestParam String userId,
                                       @RequestParam int page,
                                       @RequestParam(defaultValue = DEFAULT_ALBUMS_PAGE_SIZE) int pageSize) throws FlickrException {
