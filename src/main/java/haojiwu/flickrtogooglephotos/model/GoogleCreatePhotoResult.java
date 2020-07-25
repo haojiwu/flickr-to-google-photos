@@ -59,10 +59,6 @@ public class GoogleCreatePhotoResult {
     this.googleId = googleId;
   }
 
-  public boolean hasGoogleId() {
-    return googleId != null;
-  }
-
   public void setUrl(String url) {
     this.url = url;
   }

@@ -7,8 +7,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 @Service
 public class IdMappingService {
@@ -35,10 +37,12 @@ public class IdMappingService {
             .collect(Collectors.toList()));
   }
 
-//  public List<String> findAllTargetByIds(String userId, List<String> sourceIds) {
-//    return idMappingRepository.findAllByIdMappingKey(sourceIds.stream()
-//            .map(sourceId -> new IdMappingKey(userId, sourceId))
-//            .collect(Collectors.toList()));
-//  }
+  public Map<String, String> findSourceIdToTargetIdMap(String userId, List<String> sourceIds) {
+    Iterable<IdMapping> existingIdMappingIter = findAllByIds(userId, sourceIds);
+    return StreamSupport.stream(existingIdMappingIter.spliterator(), false)
+            .collect(Collectors.toMap(
+                    mapping -> mapping.getIdMappingKey().getSourceId(),
+                    IdMapping::getTargetId));
+  }
 
 }

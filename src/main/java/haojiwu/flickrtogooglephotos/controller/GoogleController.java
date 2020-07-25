@@ -21,16 +21,9 @@ import haojiwu.flickrtogooglephotos.model.GoogleCreatePhotoResult;
 import haojiwu.flickrtogooglephotos.model.GoogleCredential;
 import haojiwu.flickrtogooglephotos.model.IdMapping;
 import haojiwu.flickrtogooglephotos.model.IdMappingKey;
+import haojiwu.flickrtogooglephotos.service.GeotagService;
 import haojiwu.flickrtogooglephotos.service.GoogleService;
 import haojiwu.flickrtogooglephotos.service.IdMappingService;
-import org.apache.commons.imaging.ImageReadException;
-import org.apache.commons.imaging.ImageWriteException;
-import org.apache.commons.imaging.Imaging;
-import org.apache.commons.imaging.common.ImageMetadata;
-import org.apache.commons.imaging.formats.jpeg.JpegImageMetadata;
-import org.apache.commons.imaging.formats.jpeg.exif.ExifRewriter;
-import org.apache.commons.imaging.formats.tiff.TiffImageMetadata;
-import org.apache.commons.imaging.formats.tiff.write.TiffOutputSet;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,12 +41,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -63,7 +52,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 @RestController
 public class GoogleController {
@@ -79,6 +67,9 @@ public class GoogleController {
 
   @Autowired
   private GoogleService googleService;
+
+  @Autowired
+  private GeotagService geotagService;
 
   @RequestMapping("/google/auth")
   public void auth(HttpServletResponse response) throws IOException {
@@ -111,14 +102,6 @@ public class GoogleController {
     return new ErrorInfo(HttpStatus.SERVICE_UNAVAILABLE, req.getRequestURL().toString(), ex);
   }
 
-  Map<String, String> findSourceIdToGoogleIdMap(String userId, List<String> sourceIds) {
-    Iterable<IdMapping> existingIdMappingIter = idMappingService.findAllByIds(userId, sourceIds);
-    return StreamSupport.stream(existingIdMappingIter.spliterator(), false)
-            .collect(Collectors.toMap(
-                    mapping -> mapping.getIdMappingKey().getSourceId(),
-                    IdMapping::getTargetId));
-  }
-
   String downloadPhoto(FlickrPhoto sourcePhoto) throws IOException {
     String filename;
     if (sourcePhoto.getMedia().equals("video")) {
@@ -132,46 +115,6 @@ public class GoogleController {
     Files.copy(in, path, StandardCopyOption.REPLACE_EXISTING);
 
     return localPath;
-  }
-
-  String geotagPhoto(String photoLocalPath, float latitude, float longitude) {
-    try {
-      File inputFile = new File(photoLocalPath);
-      final ImageMetadata metadata = Imaging.getMetadata(inputFile);
-      if (metadata instanceof JpegImageMetadata) {
-        final JpegImageMetadata jpegMetadata = (JpegImageMetadata) metadata;
-
-        if (jpegMetadata.getExif() == null || jpegMetadata.getExif().getGPS() == null) {
-          TiffOutputSet outputSet = null;
-          final TiffImageMetadata exif = jpegMetadata.getExif();
-
-          if (null != exif) {
-            outputSet = exif.getOutputSet();
-          }
-
-          if (null == outputSet) {
-            outputSet = new TiffOutputSet();
-          }
-          outputSet.setGPSInDegrees(longitude, latitude);
-          int filenamePrefixIndex = photoLocalPath.lastIndexOf(".");
-          String geotaggedPhotoLocalPath = photoLocalPath.substring(0, filenamePrefixIndex)
-                  + "_geotagged" + photoLocalPath.substring(filenamePrefixIndex);
-
-          try (FileOutputStream fileOutputStream = new FileOutputStream(geotaggedPhotoLocalPath);
-               OutputStream outputStream = new BufferedOutputStream(fileOutputStream)) {
-            new ExifRewriter().updateExifMetadataLossless(inputFile, outputStream, outputSet);
-            logger.info("Geotag photo: {}, new path {}", photoLocalPath, geotaggedPhotoLocalPath);
-            return geotaggedPhotoLocalPath;
-          }
-        } else {
-          logger.info("Photo already has geotag {}", photoLocalPath);
-        }
-      }
-
-    } catch (ImageReadException | ImageWriteException | IOException e) {
-      logger.error("Fail to geotag photo {}", photoLocalPath, e);
-    }
-    return photoLocalPath;
   }
 
   GoogleCreatePhotoResult downloadAndUploadSourcePhoto(PhotosLibraryClient photosLibraryClient,
@@ -189,7 +132,7 @@ public class GoogleController {
       if (sourcePhoto.getMedia().equals("photo")
               && sourcePhoto.getLatitude() != null
               && sourcePhoto.getLongitude() != null) {
-        photoLocalPath = geotagPhoto(photoLocalPath, sourcePhoto.getLatitude(), sourcePhoto.getLongitude());
+        photoLocalPath = geotagService.geotagPhoto(photoLocalPath, sourcePhoto.getLatitude(), sourcePhoto.getLongitude());
       }
       NewMediaItem newMediaItem = googleService.uploadPhotoAndCreateNewMediaItem(
               photosLibraryClient, sourcePhoto, photoLocalPath);
@@ -294,7 +237,7 @@ public class GoogleController {
 
     PhotosLibraryClient photosLibraryClient = googleService.getPhotosLibraryClient(refreshToken);
     String userId = googleService.getUserId(refreshToken);
-    Map<String, String> existingSourceIdToGoogleId = findSourceIdToGoogleIdMap(userId,
+    Map<String, String> existingSourceIdToGoogleId = idMappingService.findSourceIdToTargetIdMap(userId,
             sourcePhotos.stream()
                     .map(FlickrPhoto::getId)
                     .collect(Collectors.toList()));
@@ -321,7 +264,8 @@ public class GoogleController {
     logger.info("start to create google album from source album id: {}", sourceAlbum.getId());
     Album googleAlbum = googleService.createAlbum(photosLibraryClient, sourceAlbum);
 
-    Map<String, String> sourcePhotoIdToGooglePhotoId = findSourceIdToGoogleIdMap(userId, sourceAlbum.getPhotoIds());
+    Map<String, String> sourcePhotoIdToGooglePhotoId = idMappingService.findSourceIdToTargetIdMap(
+            userId, sourceAlbum.getPhotoIds());
     List<String> googlePhotoIds = sourceAlbum.getPhotoIds().stream()
             .map(sourcePhotoIdToGooglePhotoId::get)
             .filter(Objects::nonNull)
@@ -339,11 +283,12 @@ public class GoogleController {
       logger.info("start to update album cover,  album id: {}, cover id: {}", googleAlbum.getId(), coverGooglePhotoId);
       photosLibraryClient.updateAlbumCoverPhoto(googleAlbum, coverGooglePhotoId);
     }
+    List<String> failedSourcePhotoIds = sourceAlbum.getPhotoIds().stream()
+            .filter(id -> !sourcePhotoIdToGooglePhotoId.containsKey(id))
+            .collect(Collectors.toList());
 
-    return new GoogleCreateAlbumResult(googleAlbum.getId(), googleAlbum.getProductUrl(), googlePhotoIds.size(),
-            sourceAlbum.getPhotoIds().stream()
-                    .filter(id -> !sourcePhotoIdToGooglePhotoId.containsKey(id))
-                    .collect(Collectors.toList()));
+    return new GoogleCreateAlbumResult(googleAlbum.getId(), googleAlbum.getProductUrl(),
+            googlePhotoIds.size(), failedSourcePhotoIds);
   }
 
 }
