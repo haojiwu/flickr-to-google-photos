@@ -13,10 +13,15 @@ public class FlickrPhoto {
   private final Float latitude;
   private final Float longitude;
   private final List<String> tags;
-  private final String media;
+  private final Media media;
+
+  public enum Media {
+    PHOTO,
+    VIDEO
+  }
 
   private FlickrPhoto(String id, String flickrUrl, String photoUrl, String title,
-                     String description, Float latitude, Float longitude, List<String> tags, String media) {
+                     String description, Float latitude, Float longitude, List<String> tags, Media media) {
     this.id = id;
     this.flickrUrl = flickrUrl;
     this.photoUrl = photoUrl;
@@ -60,7 +65,7 @@ public class FlickrPhoto {
     return tags;
   }
 
-  public String getMedia() {
+  public Media getMedia() {
     return media;
   }
 
@@ -88,7 +93,7 @@ public class FlickrPhoto {
     private Float latitude;
     private Float longitude;
     private List<String> tags;
-    private String media;
+    private Media media;
 
     public Builder() {
     }
@@ -137,7 +142,7 @@ public class FlickrPhoto {
       return this;
     }
 
-    public Builder setMedia(String media) {
+    public Builder setMedia(Media media) {
       this.media = media;
       return this;
     }

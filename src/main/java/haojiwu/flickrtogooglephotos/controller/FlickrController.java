@@ -82,12 +82,13 @@ public class FlickrController {
   }
 
   static FlickrPhoto convertPhoto(Photo photo) {
+    FlickrPhoto.Media media = FlickrPhoto.Media.valueOf(photo.getMedia().toUpperCase());
     FlickrPhoto.Builder builder = new FlickrPhoto.Builder()
             .setId(photo.getId())
             .setFlickrUrl(photo.getUrl())
             .setTitle(photo.getTitle())
             .setDescription(photo.getDescription())
-            .setMedia(photo.getMedia());
+            .setMedia(media);
 
     List<String> tags = photo.getTags().stream()
             .map(Tag::getValue)
@@ -102,7 +103,7 @@ public class FlickrController {
     }
 
     String photoUrl;
-    if (photo.getMedia().equals("video")) {
+    if (media == FlickrPhoto.Media.VIDEO) {
       photoUrl = photo.getVideoOriginalUrl();
     } else { // media == "photo"
       try {

@@ -27,6 +27,7 @@ import com.google.photos.types.proto.Album;
 import haojiwu.flickrtogooglephotos.model.FlickrAlbum;
 import haojiwu.flickrtogooglephotos.model.FlickrPhoto;
 import haojiwu.flickrtogooglephotos.model.IdMapping;
+import haojiwu.flickrtogooglephotos.model.Source;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -175,12 +176,12 @@ public class GoogleService {
     }
   }
 
-  static String buildDefaultAlbumTitle(String source) {
-    return "Photos from " + source;
+  static String buildDefaultAlbumTitle(Source source) {
+    return "Photos from " + source.getName();
   }
 
 
-  public String getDefaultAlbumId(PhotosLibraryClient photosLibraryClient, String userId, String source) {
+  public String getDefaultAlbumId(PhotosLibraryClient photosLibraryClient, String userId, Source source) {
     String defaultAlbumTitle = buildDefaultAlbumTitle(source);
     String defaultAlbumId = idMappingService.findById(userId, userId)
             .map(IdMapping::getTargetId)
@@ -222,7 +223,7 @@ public class GoogleService {
 
     String mineType;
     // flickr doesn't provide original video for API download. It will be converted to MP4.
-    if (sourcePhoto.getMedia().equals("video")) {
+    if (sourcePhoto.getMedia() == FlickrPhoto.Media.VIDEO) {
       mineType = "video/mp4";
     } else {
       mineType = "image/png"; // For google photo API it also works for JPG image

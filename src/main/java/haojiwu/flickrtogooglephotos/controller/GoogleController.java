@@ -21,6 +21,7 @@ import haojiwu.flickrtogooglephotos.model.GoogleCreatePhotoResult;
 import haojiwu.flickrtogooglephotos.model.GoogleCredential;
 import haojiwu.flickrtogooglephotos.model.IdMapping;
 import haojiwu.flickrtogooglephotos.model.IdMappingKey;
+import haojiwu.flickrtogooglephotos.model.Source;
 import haojiwu.flickrtogooglephotos.service.GeotagService;
 import haojiwu.flickrtogooglephotos.service.GoogleService;
 import haojiwu.flickrtogooglephotos.service.IdMappingService;
@@ -104,7 +105,7 @@ public class GoogleController {
 
   String downloadPhoto(FlickrPhoto sourcePhoto) throws IOException {
     String filename;
-    if (sourcePhoto.getMedia().equals("video")) {
+    if (sourcePhoto.getMedia() == FlickrPhoto.Media.VIDEO) {
       filename = sourcePhoto.getId() + ".mp4";
     } else { // photo
       filename = sourcePhoto.getPhotoUrl().substring(sourcePhoto.getPhotoUrl().lastIndexOf("/"));
@@ -129,7 +130,7 @@ public class GoogleController {
     }
     try {
       String photoLocalPath = downloadPhoto(sourcePhoto);
-      if (sourcePhoto.getMedia().equals("photo")
+      if (sourcePhoto.getMedia() == FlickrPhoto.Media.PHOTO
               && sourcePhoto.getLatitude() != null
               && sourcePhoto.getLongitude() != null) {
         photoLocalPath = geotagService.geotagPhoto(photoLocalPath, sourcePhoto.getLatitude(), sourcePhoto.getLongitude());
@@ -197,7 +198,7 @@ public class GoogleController {
   }
 
   void updateDefaultAlbumAndIdMapping(PhotosLibraryClient photosLibraryClient,
-                                      String userId, String source, List<GoogleCreatePhotoResult> results) {
+                                      String userId, Source source, List<GoogleCreatePhotoResult> results) {
 
     List<GoogleCreatePhotoResult> resultWithSuccessStatus = results.stream()
             .filter(r -> r.getStatus() == GoogleCreatePhotoResult.Status.SUCCESS)
@@ -226,13 +227,9 @@ public class GoogleController {
 
   @PostMapping("/google/photo")
   public List<GoogleCreatePhotoResult> createPhotos(@RequestBody List<FlickrPhoto> sourcePhotos, @RequestParam String refreshToken,
-                                                    @RequestParam(defaultValue = "Flickr") String source) throws IOException {
+                                                    @RequestParam(defaultValue = "FLICKR") Source source) throws IOException {
     if (sourcePhotos.size() > GOOGLE_BATCH_SIZE_MAX) {
       throw new IllegalArgumentException("Google Photo API only accept " + GOOGLE_BATCH_SIZE_MAX + " photos in each batch");
-    }
-
-    if (!source.equals("Flickr")) {
-      throw new IllegalArgumentException("We only support Flickr as photo source for now");
     }
 
     PhotosLibraryClient photosLibraryClient = googleService.getPhotosLibraryClient(refreshToken);
@@ -253,10 +250,7 @@ public class GoogleController {
 
   @PostMapping("/google/album")
   public GoogleCreateAlbumResult createAlbum(@RequestBody FlickrAlbum sourceAlbum, @RequestParam String refreshToken,
-                                             @RequestParam(defaultValue = "Flickr") String source) throws IOException {
-    if (!source.equals("Flickr")) {
-      throw new IllegalArgumentException("We only support Flickr as photo source for now");
-    }
+                                             @RequestParam(defaultValue = "FLICKR") Source   source) throws IOException {
 
     PhotosLibraryClient photosLibraryClient = googleService.getPhotosLibraryClient(refreshToken);
     String userId = googleService.getUserId(refreshToken);
