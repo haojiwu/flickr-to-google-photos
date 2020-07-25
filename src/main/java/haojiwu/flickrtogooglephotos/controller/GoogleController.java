@@ -326,7 +326,10 @@ public class GoogleController {
       photosLibraryClient.updateAlbumCoverPhoto(googleAlbum, coverGooglePhotoId);
     }
 
-    return new GoogleCreateAlbumResult(googleAlbum.getId(), googleAlbum.getProductUrl(), googlePhotoIds.size());
+    return new GoogleCreateAlbumResult(googleAlbum.getId(), googleAlbum.getProductUrl(), googlePhotoIds.size(),
+            sourceAlbum.getPhotoIds().stream()
+                    .filter(id -> !sourcePhotoIdToGooglePhotoId.containsKey(id))
+                    .collect(Collectors.toList()));
   }
 
 }
