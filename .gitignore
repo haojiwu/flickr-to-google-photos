@@ -4,6 +4,7 @@ target/
 !**/src/main/**
 !**/src/test/**
 *.p12
+*.db
 
 ### STS ###
 .apt_generated

@@ -129,7 +129,20 @@ public class GoogleController {
               .build();
     }
     try {
-      String photoLocalPath = downloadPhoto(sourcePhoto);
+      String photoLocalPath;
+      try {
+        photoLocalPath = downloadPhoto(sourcePhoto);
+      } catch (IOException e) {
+        if (StringUtils.containsIgnoreCase(e.getMessage(), "HTTP response code: 50")) {
+          // Flickr API sometimes has connection issue. retry once
+          logger.info("Flickr 5xx error (usually gateway error). retry once for {}. error: {}",
+                  sourcePhoto.getPhotoUrl(), e.getMessage());
+          photoLocalPath = downloadPhoto(sourcePhoto);
+        } else {
+          throw e;
+        }
+      }
+
       if (sourcePhoto.getMedia() == FlickrPhoto.Media.PHOTO
               && sourcePhoto.getLatitude() != null
               && sourcePhoto.getLongitude() != null) {
