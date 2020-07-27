@@ -214,7 +214,13 @@ public class GoogleService {
     itemDescription.append(sourcePhoto.getTags().stream()
             .map(tag -> "#" + tag)
             .collect(Collectors.joining(" ")));
-    return itemDescription.toString();
+    String ret = itemDescription.toString();
+    // NewMediaItemFactory.createNewMediaItem() forces description can't be empty, although it is not part of API requirement.
+    // Put one space as placeholder
+    if (ret.isEmpty()) {
+      ret = " ";
+    }
+    return ret;
   }
 
   public NewMediaItem uploadPhotoAndCreateNewMediaItem(PhotosLibraryClient photosLibraryClient,
