@@ -13,46 +13,67 @@ def get_flickr_photos(page):
     r = requests.get(url=url, params=params, verify=False)
     return r.json()
 
-def create_google_photos(flickr_photos_batch):
+def create_google_photos(flickr_photos_batch, force_unique):
     url = host + "/google/photo"
-    params = {'refreshToken': google_refresh_token}
+    params = {'refreshToken': google_refresh_token, 'forceUnique': force_unique}
     r = requests.post(url=url, json=flickr_photos_batch, params=params, verify=False)
     return r.json()
 
 photo_page = 1 # set to 1 to star from beginning, or the to other to resume from other page
 google_batch_size = 50 # Google Photo API only allows max 50 as batch size
 
-def create_google_photos_in_batch(flickr_photos):
+def create_google_photos_in_batch(flickr_photos, force_unique='false'):
     google_batch_num = 0
-    fail_flickr_photo_ids = set()
+    failed_flickr_photo_ids = set()
+    non_unique_flickr_photo_ids = set()
     flickr_photos_batchs = [flickr_photos[i:i + google_batch_size] for i in range(0, len(flickr_photos), google_batch_size)]
     for flickr_photos_batch in flickr_photos_batchs:
         print('google batch num: {}'.format(google_batch_num))
         print(json.dumps(flickr_photos_batch, indent=2))
-        create_response = create_google_photos(flickr_photos_batch)
+        create_response = create_google_photos(flickr_photos_batch, force_unique)
         print(json.dumps(create_response, indent=2))
 
         fail_ids = set([r['sourceId'] for r in create_response if r['status'] == 'FAIL'])
         print('size of fail ids: {}'.format(len(fail_ids)))
-        fail_flickr_photo_ids.update(fail_ids)
+        failed_flickr_photo_ids.update(fail_ids)
+
+        non_unique_ids = set([r['sourceId'] for r in create_response if r['status'] == 'EXIST_CAN_NOT_CREATE'])
+        print('size of non unique ids: {}'.format(len(non_unique_ids)))
+        non_unique_flickr_photo_ids.update(non_unique_ids)
+
         google_batch_num = google_batch_num + 1
 
-    return [photo for photo in flickr_photos if photo['id'] in fail_flickr_photo_ids]
+    ret = dict()
+    ret['failed'] = [photo for photo in flickr_photos if photo['id'] in failed_flickr_photo_ids]
+    ret['non_unique'] = [photo for photo in flickr_photos if photo['id'] in non_unique_flickr_photo_ids]
+
+    return ret
 
 all_failed_flickr_photos = []
+all_non_unique_flickr_photos = []
 while True:
     response = get_flickr_photos(photo_page)
     #print(json.dumps(response, indent=2))
     print('photo_page: {}, hasNext: {}'.format(photo_page, response['hasNext']))
     flickr_photos = response['flickrPhotos']
-    failed_flickr_photos = create_google_photos_in_batch(flickr_photos)
-    all_failed_flickr_photos.extend(failed_flickr_photos)
-    if (response['hasNext'] == False): # should be False. Set to True if you only want to try first page
+    result = create_google_photos_in_batch(flickr_photos)
+    all_failed_flickr_photos.extend(result['failed'])
+    all_non_unique_flickr_photos.extend(result['non_unique'])
+    if (response['hasNext'] == False): # should be False
         break
     else:
         photo_page = photo_page + 1
 
-print('start to retry create failed flickr photo. size: {}'.format(len(all_failed_flickr_photos)))
-failed_again_flickr_photos = create_google_photos_in_batch(all_failed_flickr_photos)
-print("failed again photos:")
-print(json.dumps(failed_again_flickr_photos, indent=2))  # need troubleshooting. Either Flickr service down or other issues
+print('start to retry failed flickr photo. size: {}'.format(len(all_failed_flickr_photos)))
+retry_failed_result = create_google_photos_in_batch(all_failed_flickr_photos)
+print("retry failed again but still failed photos:")
+print(json.dumps(retry_failed_result['failed'], indent=2))
+print("retry failed again but non unique photos:")
+print(json.dumps(retry_failed_result['non_unique'], indent=2))
+
+print('start to retry non unique flickr photo. size: {}'.format(len(all_non_unique_flickr_photos)))
+retry_non_unique_result = create_google_photos_in_batch(all_non_unique_flickr_photos, 'true')
+print("retry non unique again but still failed photos:")
+print(json.dumps(retry_non_unique_result['failed'], indent=2))
+print("retry non unique again but non unique photos:")
+print(json.dumps(retry_non_unique_result['non_unique'], indent=2))
