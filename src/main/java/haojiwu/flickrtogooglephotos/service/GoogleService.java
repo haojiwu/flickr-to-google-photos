@@ -16,17 +16,24 @@ import com.google.common.cache.LoadingCache;
 import com.google.photos.library.v1.PhotosLibraryClient;
 import com.google.photos.library.v1.PhotosLibrarySettings;
 import com.google.photos.library.v1.proto.AlbumPosition;
+import com.google.photos.library.v1.proto.BatchCreateMediaItemsResponse;
 import com.google.photos.library.v1.proto.NewEnrichmentItem;
 import com.google.photos.library.v1.proto.NewMediaItem;
+import com.google.photos.library.v1.proto.NewMediaItemResult;
 import com.google.photos.library.v1.upload.UploadMediaItemRequest;
 import com.google.photos.library.v1.upload.UploadMediaItemResponse;
 import com.google.photos.library.v1.util.AlbumPositionFactory;
 import com.google.photos.library.v1.util.NewEnrichmentItemFactory;
 import com.google.photos.library.v1.util.NewMediaItemFactory;
 import com.google.photos.types.proto.Album;
+import com.google.photos.types.proto.MediaItem;
+import com.google.rpc.Code;
+import com.google.rpc.Status;
 import haojiwu.flickrtogooglephotos.model.FlickrAlbum;
 import haojiwu.flickrtogooglephotos.model.FlickrPhoto;
+import haojiwu.flickrtogooglephotos.model.GoogleCreatePhotoResult;
 import haojiwu.flickrtogooglephotos.model.IdMapping;
+import haojiwu.flickrtogooglephotos.model.IdMappingKey;
 import haojiwu.flickrtogooglephotos.model.Source;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -38,7 +45,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -46,14 +57,26 @@ import java.util.stream.Collectors;
 @Service
 public class GoogleService {
   private static final Logger logger = LoggerFactory.getLogger(GoogleService.class);
-
+  private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
   private static final NetHttpTransport NET_HTTP_TRANSPORT = new NetHttpTransport();
+  private static final AlbumPosition FIRST_IN_ALBUM = AlbumPositionFactory.createFirstInAlbum();
+
 
   @Value("${app.host}")
   private String appHost;
 
+  @Value("${app.photoFolder}")
+  private String photoFolder;
+
+
   @Autowired
   private IdMappingService idMappingService;
+
+  @Autowired
+  private RetryService retryService;
+
+  @Autowired
+  private ExifService exifService;
 
   private final String clientId;
   private final String clientSecret;
@@ -97,7 +120,6 @@ public class GoogleService {
             .setRedirectUri(getAuthCallbackUrl())
             .execute();
   }
-
 
   Userinfo getUserInfo(String refreshToken) throws IOException {
     UserCredentials userCredentials = UserCredentials.newBuilder()
@@ -166,7 +188,7 @@ public class GoogleService {
                     });
   }
 
-  public PhotosLibraryClient getPhotosLibraryClient(String refreshToken) throws IOException {
+  private PhotosLibraryClient getPhotosLibraryClient(String refreshToken) throws IOException {
     try {
       return photosLibraryClientCache.get(refreshToken);
     } catch (ExecutionException e) {
@@ -176,33 +198,170 @@ public class GoogleService {
     }
   }
 
-  static String buildDefaultAlbumTitle(Source source) {
+
+  private String downloadPhoto(FlickrPhoto sourcePhoto) throws IOException {
+    String filename;
+    if (sourcePhoto.getMedia() == FlickrPhoto.Media.VIDEO) {
+      filename = sourcePhoto.getId() + ".mp4";
+    } else { // photo
+      filename = sourcePhoto.getPhotoUrl().substring(sourcePhoto.getPhotoUrl().lastIndexOf("/"));
+    }
+    String localPath = photoFolder + "/" + filename;
+    retryService.downloadFile(sourcePhoto.getPhotoUrl(), localPath);
+    return localPath;
+  }
+
+  public GoogleCreatePhotoResult downloadAndUploadSourcePhoto(String refreshToken,
+                                                              Map<String, String> existingSourceIdToGoogleId,
+                                                              FlickrPhoto sourcePhoto,
+                                                              boolean forceUnique)  {
+    String sourceId = sourcePhoto.getId();
+    if (existingSourceIdToGoogleId.containsKey(sourceId)) {
+      logger.info("Don't need t to migrate {}", sourceId);
+      return new GoogleCreatePhotoResult.Builder(sourceId)
+              .setStatus(GoogleCreatePhotoResult.Status.EXIST_NO_NEED_TO_CREATE)
+              .setGoogleId(existingSourceIdToGoogleId.get(sourceId))
+              .build();
+    }
+    try {
+      PhotosLibraryClient photosLibraryClient = getPhotosLibraryClient(refreshToken);
+
+      String photoLocalPath = downloadPhoto(sourcePhoto);
+
+      if (sourcePhoto.getMedia() == FlickrPhoto.Media.PHOTO
+              && sourcePhoto.getLatitude() != null
+              && sourcePhoto.getLongitude() != null) {
+        photoLocalPath = exifService.geotagPhoto(photoLocalPath, sourcePhoto.getLatitude(), sourcePhoto.getLongitude());
+      }
+
+      if (forceUnique) {
+        photoLocalPath = exifService.appendUserComment(photoLocalPath,
+                "flickr-to-google-photos " +  DATE_FORMAT.format(new Date()));
+      }
+
+      NewMediaItem newMediaItem = uploadPhotoAndCreateNewMediaItem(photosLibraryClient, sourcePhoto, photoLocalPath);
+
+      return new GoogleCreatePhotoResult.Builder(sourcePhoto.getId())
+              .setStatus(GoogleCreatePhotoResult.Status.SUCCESS)
+              .setNewMediaItem(newMediaItem)
+              .build();
+    } catch (Exception e) {
+      logger.error("Error when adding photo: {}", sourcePhoto.getId(), e);
+      return new GoogleCreatePhotoResult.Builder(sourcePhoto.getId())
+              .setStatus(GoogleCreatePhotoResult.Status.FAIL)
+              .setError(e.getMessage())
+              .build();
+    }
+  }
+
+  public void createMediaItems(String refreshToken,
+                               String userId,
+                               List<GoogleCreatePhotoResult> results) throws IOException {
+    PhotosLibraryClient photosLibraryClient = getPhotosLibraryClient(refreshToken);
+    List<GoogleCreatePhotoResult> resultsWithNewItems = results.stream()
+            .filter(GoogleCreatePhotoResult::hasNewMediaItem)
+            .collect(Collectors.toList());
+
+    if (resultsWithNewItems.isEmpty()) {
+      logger.info("No new media items need to be created. userId {}", userId);
+      return;
+    }
+
+    BatchCreateMediaItemsResponse response = retryService.batchCreateMediaItems(photosLibraryClient,
+            resultsWithNewItems.stream()
+                    .map(GoogleCreatePhotoResult::getNewMediaItem)
+                    .collect(Collectors.toList()));
+    assert (response.getNewMediaItemResultsList().size() == resultsWithNewItems.size());
+    for (int i = 0; i < response.getNewMediaItemResultsList().size(); i++) {
+      NewMediaItemResult itemsResponse = response.getNewMediaItemResultsList().get(i);
+      GoogleCreatePhotoResult result = resultsWithNewItems.get(i);
+      Status status = itemsResponse.getStatus();
+      if (status.getCode() == Code.OK_VALUE) {
+        MediaItem mediaItem = itemsResponse.getMediaItem();
+        logger.info("success create mediaItem: id {}, source id: {}", mediaItem.getId(), result.getSourceId());
+        result.setGoogleId(mediaItem.getId());
+        result.setUrl(mediaItem.getProductUrl());
+        // Google Photos can upload the same (in terms of checksum, including exif) photo again but only keep one media item.
+        // If
+        //  1. use already upload it manually
+        //  2. other app upload it
+        //  3. the same photo upload multiple times in flickr
+        // NewMediaItemResult still has OK_VALUE status, but the photo information from import is not written to media item.
+        // Also, for 1 and 2, our app can't add this photo to any album we created.
+        // Therefore we need to assign different return status for this photo.
+        // For photo, we compare filename in media item with input (flickr url) to know if we need to assign EXIST_CAN_NOT_CREATE status
+        // User can post /google/photo again with "forceUnique=true" to force create unique photo (by adding exif tag)
+        // This issue may not exist for video since every flickr video was encoded to mp4 (flickr api doesn't support original video)
+        // Video files should have different checksum after encoding
+        if (StringUtils.isNotBlank(mediaItem.getFilename())
+                && !mediaItem.getFilename().equals(result.getNewMediaItem().getSimpleMediaItem().getFileName())) {
+          logger.info("photo is not unique and it doesn't create mediaItem with input information. "
+                          + "existing mediaItem filename {} is not equal to input {}",
+                  mediaItem.getFilename(), result.getNewMediaItem().getSimpleMediaItem().getFileName());
+          result.setStatus(GoogleCreatePhotoResult.Status.EXIST_CAN_NOT_CREATE);
+        }
+      } else {
+        logger.error("fail to create mediaItem, error: {}, source id: {}", status.getMessage(), result.getSourceId());
+        result.setStatus(GoogleCreatePhotoResult.Status.FAIL);
+        result.setError(status.getMessage());
+      }
+    }
+  }
+
+  public void updateDefaultAlbumAndIdMapping(String refreshToken,
+                                             String userId,
+                                             Source source,
+                                             List<GoogleCreatePhotoResult> results) throws IOException {
+    PhotosLibraryClient photosLibraryClient = getPhotosLibraryClient(refreshToken);
+    List<GoogleCreatePhotoResult> resultWithSuccessStatus = results.stream()
+            .filter(r -> r.getStatus() == GoogleCreatePhotoResult.Status.SUCCESS)
+            .collect(Collectors.toList());
+
+    if (resultWithSuccessStatus.isEmpty()) {
+      logger.info("Not media item to add default album and update id mapping. userId: {}", userId);
+      return;
+    }
+
+    String defaultAlbumId = getDefaultAlbumId(photosLibraryClient, userId, source);
+
+    logger.info("add {} new uploaded photo to default album {}", resultWithSuccessStatus.size(), defaultAlbumId);
+    retryService.batchAddMediaItemsToAlbum(photosLibraryClient, defaultAlbumId,
+            resultWithSuccessStatus.stream()
+                    .map(GoogleCreatePhotoResult::getGoogleId)
+                    .collect(Collectors.toList()));
+
+    idMappingService.saveOrUpdateAll(
+            resultWithSuccessStatus.stream()
+                    .map(r -> new IdMapping(new IdMappingKey(userId, r.getSourceId()), r.getGoogleId()))
+                    .collect(Collectors.toList()));
+  }
+
+  private static String buildDefaultAlbumTitle(Source source) {
     return "Photos from " + source.getName();
   }
 
-
-  public String getDefaultAlbumId(PhotosLibraryClient photosLibraryClient, String userId, Source source) {
+  private String getDefaultAlbumId(PhotosLibraryClient photosLibraryClient, String userId, Source source) {
     String defaultAlbumTitle = buildDefaultAlbumTitle(source);
     String defaultAlbumId = idMappingService.findById(userId, userId)
             .map(IdMapping::getTargetId)
             .orElse(null);
     if (defaultAlbumId == null) {
-      for (Album album: photosLibraryClient.listAlbums(true).iterateAll()) {
+      for (Album album: retryService.listAlbums(photosLibraryClient,true).iterateAll()) {
         if (album.getTitle().equals(defaultAlbumTitle)) {
           defaultAlbumId = album.getId();
           break;
         }
       }
       if (defaultAlbumId == null) {
-        defaultAlbumId = photosLibraryClient.createAlbum(defaultAlbumTitle).getId();
+        defaultAlbumId = retryService.createAlbum(photosLibraryClient, defaultAlbumTitle).getId();
+        // a little hack: user id as source id to map to default album id
         idMappingService.saveOrUpdate(userId, userId, defaultAlbumId);
       }
     }
     return defaultAlbumId;
   }
 
-  static String buildItemDescription(FlickrPhoto sourcePhoto) {
-
+  private static String buildItemDescription(FlickrPhoto sourcePhoto) {
     StringBuilder itemDescription = new StringBuilder();
     if (StringUtils.isNotBlank(sourcePhoto.getTitle())) {
       itemDescription.append(sourcePhoto.getTitle()).append("\n");
@@ -210,7 +369,6 @@ public class GoogleService {
     if (StringUtils.isNotBlank(sourcePhoto.getDescription())) {
       itemDescription.append(sourcePhoto.getDescription()).append("\n");
     }
-
     itemDescription.append(sourcePhoto.getTags().stream()
             .map(tag -> "#" + tag)
             .collect(Collectors.joining(" ")));
@@ -223,10 +381,9 @@ public class GoogleService {
     return ret;
   }
 
-  public NewMediaItem uploadPhotoAndCreateNewMediaItem(PhotosLibraryClient photosLibraryClient,
-                                                       FlickrPhoto sourcePhoto,
-                                                       String photoLocalPath) throws IOException {
-
+  private NewMediaItem uploadPhotoAndCreateNewMediaItem(PhotosLibraryClient photosLibraryClient,
+                                                        FlickrPhoto sourcePhoto,
+                                                        String photoLocalPath) throws IOException {
     String mineType;
     // flickr doesn't provide original video for API download. It will be converted to MP4.
     if (sourcePhoto.getMedia() == FlickrPhoto.Media.VIDEO) {
@@ -242,7 +399,7 @@ public class GoogleService {
                       .setMimeType(mineType)
                       .setDataFile(file)
                       .build();
-      UploadMediaItemResponse uploadResponse = photosLibraryClient.uploadMediaItem(uploadRequest);
+      UploadMediaItemResponse uploadResponse = retryService.uploadMediaItem(photosLibraryClient, uploadRequest);
       if (uploadResponse.getError().isPresent()) {
         logger.error("upload photo fail. photoLocalPath: {}", photoLocalPath, uploadResponse.getError().get().getCause());
         throw (ApiException) uploadResponse.getError().get().getCause();
@@ -254,7 +411,7 @@ public class GoogleService {
     }
   }
 
-  static String buildAlbumDescription(FlickrAlbum sourceAlbum) {
+  private static String buildAlbumDescription(FlickrAlbum sourceAlbum) {
     StringBuilder albumDescription = new StringBuilder();
     if (StringUtils.isNotBlank(sourceAlbum.getDescription())) {
       albumDescription.append(sourceAlbum.getDescription()).append("\n");
@@ -263,14 +420,28 @@ public class GoogleService {
     return albumDescription.toString();
   }
 
-  public Album createAlbum(PhotosLibraryClient photosLibraryClient, FlickrAlbum sourceAlbum) {
-    Album googleAlbum = photosLibraryClient.createAlbum(sourceAlbum.getTitle());
+  public Album createAlbum(String refreshToken, FlickrAlbum sourceAlbum) throws IOException {
+    PhotosLibraryClient photosLibraryClient = getPhotosLibraryClient(refreshToken);
+    Album googleAlbum = retryService.createAlbum(photosLibraryClient, sourceAlbum.getTitle());
 
     NewEnrichmentItem newEnrichmentItem =
             NewEnrichmentItemFactory.createTextEnrichment(buildAlbumDescription(sourceAlbum));
-    AlbumPosition albumPosition = AlbumPositionFactory.createFirstInAlbum();
-    photosLibraryClient.addEnrichmentToAlbum(googleAlbum.getId(), newEnrichmentItem, albumPosition);
+    retryService.addEnrichmentToAlbum(photosLibraryClient, googleAlbum.getId(), newEnrichmentItem, FIRST_IN_ALBUM);
     return googleAlbum;
+  }
+
+  public void batchAddMediaItemsToAlbum(String refreshToken,
+                                        String albumId,
+                                        List<String> mediaItemIds) throws IOException {
+    PhotosLibraryClient photosLibraryClient = getPhotosLibraryClient(refreshToken);
+    retryService.batchAddMediaItemsToAlbum(photosLibraryClient, albumId, mediaItemIds);
+  }
+
+  public void updateAlbumCoverPhoto(String refreshToken,
+                                    Album album,
+                                    String newCoverPhotoMediaItemId) throws IOException {
+    PhotosLibraryClient photosLibraryClient = getPhotosLibraryClient(refreshToken);
+    retryService.updateAlbumCoverPhoto(photosLibraryClient, album, newCoverPhotoMediaItemId);
   }
 
 }
