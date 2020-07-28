@@ -105,10 +105,10 @@ public class FlickrService {
     while (true) {
       logger.info("start to get photos from photo set {} token: {},  page: {}", photoSetId, token, page);
       PhotoList<Photo> photos = flickr.getPhotosetsInterface().getPhotos(photoSetId, PHOTOS_PAGE_SIZE, page);
-      logger.info("photos in photo set {}, page: {}, size: {}, perPage: {}",
-              photoSetId, page, photos.size(), photos.getPerPage());
+      logger.info("photos in photo set {}, page: {}, size: {}, perPage: {}, pages: {}",
+              photoSetId, photos.getPage(), photos.size(), photos.getPerPage(), photos.getPages());
       ret.addAll(photos);
-      if (photos.size() < photos.getPerPage()) {
+      if (photos.getPage() == photos.getPages()) {
         break;
       }
       page++;

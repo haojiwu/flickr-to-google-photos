@@ -134,7 +134,8 @@ public class FlickrController {
             .map(FlickrController::convertPhoto)
             .collect(Collectors.toList());
 
-    return new FlickrPhotoList(flickrPhotos, photos.getTotal(), page, photos.getPerPage(),photos.size() == photos.getPerPage());
+    return new FlickrPhotoList(flickrPhotos, photos.getTotal(), photos.getPage(), photos.getPerPage(),
+            photos.getPage() < photos.getPages());
   }
 
   @GetMapping("/flickr/album")
@@ -161,7 +162,7 @@ public class FlickrController {
 
       flickrAlbums.add(flickrAlbum);
     }
-    return new FlickrAlbumList(flickrAlbums, photosets.getTotal(), page, photosets.getPerPage(),
-            photosets.getPhotosets().size() == photosets.getPerPage());
+    return new FlickrAlbumList(flickrAlbums, photosets.getTotal(), photosets.getPage(), photosets.getPerPage(),
+            photosets.getPage() < photosets.getPages());
   }
 }
