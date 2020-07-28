@@ -22,7 +22,7 @@ import haojiwu.flickrtogooglephotos.model.GoogleCredential;
 import haojiwu.flickrtogooglephotos.model.IdMapping;
 import haojiwu.flickrtogooglephotos.model.IdMappingKey;
 import haojiwu.flickrtogooglephotos.model.Source;
-import haojiwu.flickrtogooglephotos.service.GeotagService;
+import haojiwu.flickrtogooglephotos.service.ExifService;
 import haojiwu.flickrtogooglephotos.service.GoogleService;
 import haojiwu.flickrtogooglephotos.service.IdMappingService;
 import org.apache.commons.lang3.StringUtils;
@@ -49,6 +49,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -58,6 +60,8 @@ import java.util.stream.Collectors;
 public class GoogleController {
   Logger logger = LoggerFactory.getLogger(GoogleController.class);
   private static final int GOOGLE_BATCH_SIZE_MAX = 50;
+  private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+
 
   @Value("${app.photoFolder}")
   private String photoFolder;
@@ -70,7 +74,7 @@ public class GoogleController {
   private GoogleService googleService;
 
   @Autowired
-  private GeotagService geotagService;
+  private ExifService exifService;
 
   @RequestMapping("/google/auth")
   public void auth(HttpServletResponse response) throws IOException {
@@ -119,7 +123,8 @@ public class GoogleController {
   }
 
   GoogleCreatePhotoResult downloadAndUploadSourcePhoto(PhotosLibraryClient photosLibraryClient,
-                                                       Map<String, String> existingSourceIdToGoogleId, FlickrPhoto sourcePhoto) {
+                                                       Map<String, String> existingSourceIdToGoogleId,
+                                                       FlickrPhoto sourcePhoto, boolean forceUnique) {
     String sourceId = sourcePhoto.getId();
     if (existingSourceIdToGoogleId.containsKey(sourceId)) {
       logger.info("Don't need t to migrate {}", sourceId);
@@ -146,8 +151,14 @@ public class GoogleController {
       if (sourcePhoto.getMedia() == FlickrPhoto.Media.PHOTO
               && sourcePhoto.getLatitude() != null
               && sourcePhoto.getLongitude() != null) {
-        photoLocalPath = geotagService.geotagPhoto(photoLocalPath, sourcePhoto.getLatitude(), sourcePhoto.getLongitude());
+        photoLocalPath = exifService.geotagPhoto(photoLocalPath, sourcePhoto.getLatitude(), sourcePhoto.getLongitude());
       }
+
+      if (forceUnique) {
+        photoLocalPath = exifService.appendUserComment(photoLocalPath,
+                "flickr-to-google-photos " +  DATE_FORMAT.format(new Date()));
+      }
+
       NewMediaItem newMediaItem = googleService.uploadPhotoAndCreateNewMediaItem(
               photosLibraryClient, sourcePhoto, photoLocalPath);
 
@@ -187,15 +198,18 @@ public class GoogleController {
         logger.info("success create mediaItem: id {}, source id: {}", mediaItem.getId(), result.getSourceId());
         result.setGoogleId(mediaItem.getId());
         result.setUrl(mediaItem.getProductUrl());
-        // Google Photos can upload the same (in terms of checksum, including exif) photo again and only keep one media item.
-        // If use already upload it, our app can upload successfully, but the media item data will not be overwritten.
-        // Also, our app can't add this photo to any album we created.
+        // Google Photos can upload the same (in terms of checksum, including exif) photo again but only keep one media item.
+        // If
+        //  1. use already upload it manually
+        //  2. other app upload it
+        //  3. the same photo upload multiple times in flickr
+        // our app can upload successfully, but the media item data will not be overwritten.
+        // Also, for 1 and 2, our app can't add this photo to any album we created.
         // Therefore we need to assign different return status for this photo.
         // For photo, we compare filename in media item with from input (flickr url) to know if we need to assign
         // EXIST_CAN_NOT_CREATE status
-        // For video, filename in media item will be empty. We can't handle this case.
-        // However, since flickr doesn't support download original video by API, and after encoding MP4 file should
-        // have different checksum since nobody know the parameter flickr used to encode MP4, video file should not suffer this issue.
+        // This issue may not exist for video since every flickr video was encoded to mp4 (flickr api doesn't support original video)
+        // Video files should have different checksum after encoding
         if (StringUtils.isNotBlank(mediaItem.getFilename())
                 && !mediaItem.getFilename().equals(result.getNewMediaItem().getSimpleMediaItem().getFileName())) {
           logger.info("mediaItem was uploaded by user. mediaItem filename {} is not equal to input {}",
@@ -240,7 +254,8 @@ public class GoogleController {
 
   @PostMapping("/google/photo")
   public List<GoogleCreatePhotoResult> createPhotos(@RequestBody List<FlickrPhoto> sourcePhotos, @RequestParam String refreshToken,
-                                                    @RequestParam(defaultValue = "FLICKR") Source source) throws IOException {
+                                                    @RequestParam(defaultValue = "FLICKR") Source source,
+                                                    @RequestParam(defaultValue = "false") boolean forceUnique) throws IOException {
     if (sourcePhotos.size() > GOOGLE_BATCH_SIZE_MAX) {
       throw new IllegalArgumentException("Google Photo API only accept " + GOOGLE_BATCH_SIZE_MAX + " photos in each batch");
     }
@@ -253,7 +268,8 @@ public class GoogleController {
                     .collect(Collectors.toList()));
 
     List<GoogleCreatePhotoResult> results = sourcePhotos.stream()
-            .map(sourcePhoto -> downloadAndUploadSourcePhoto(photosLibraryClient, existingSourceIdToGoogleId, sourcePhoto))
+            .map(sourcePhoto -> downloadAndUploadSourcePhoto(
+                    photosLibraryClient, existingSourceIdToGoogleId, sourcePhoto, forceUnique))
             .collect(Collectors.toList());
 
     createMediaItems(photosLibraryClient, userId, results);
