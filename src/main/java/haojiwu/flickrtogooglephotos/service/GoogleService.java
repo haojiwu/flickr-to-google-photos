@@ -228,16 +228,19 @@ public class GoogleService {
 
       String photoLocalPath = downloadPhoto(sourcePhoto);
 
+      ExifService.Request request = new ExifService.Request(photoLocalPath);
       if (sourcePhoto.getMedia() == FlickrPhoto.Media.PHOTO
               && sourcePhoto.getLatitude() != null
               && sourcePhoto.getLongitude() != null) {
-        photoLocalPath = exifService.geotagPhoto(photoLocalPath, sourcePhoto.getLatitude(), sourcePhoto.getLongitude());
+        request.latitude = sourcePhoto.getLatitude();
+        request.longitude = sourcePhoto.getLongitude();
       }
 
       if (forceUnique) {
-        photoLocalPath = exifService.appendUserComment(photoLocalPath,
-                "flickr-to-google-photos " +  DATE_FORMAT.format(new Date()));
+        request.userComment = "flickr-to-google-photos " +  DATE_FORMAT.format(new Date());
       }
+
+      photoLocalPath = exifService.tagPhoto(request);
 
       NewMediaItem newMediaItem = uploadPhotoAndCreateNewMediaItem(photosLibraryClient, sourcePhoto, photoLocalPath);
 

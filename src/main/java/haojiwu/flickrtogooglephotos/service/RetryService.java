@@ -126,7 +126,7 @@ public class RetryService {
           backoff = @Backoff(delay = DELAY, multiplier = MULTIPLIER))
   public UploadMediaItemResponse uploadMediaItem(PhotosLibraryClient photosLibraryClient,
                                                        UploadMediaItemRequest request) {
-    logger.info("uploadMediaItem with retry request filename: {}", request.getFileName());
+    logger.info("uploadMediaItem with retry");
     return photosLibraryClient.uploadMediaItem(request);
   }
 

@@ -27,88 +27,80 @@ public class ExifService {
   private static final Logger logger = LoggerFactory.getLogger(ExifService.class);
   private final ExifRewriter exifRewriter = new ExifRewriter();
 
-  public String geotagPhoto(String photoLocalPath, float latitude, float longitude) {
-    try {
-      File inputFile = new File(photoLocalPath);
-      final ImageMetadata metadata = Imaging.getMetadata(inputFile);
-      if (metadata instanceof JpegImageMetadata) {
-        final JpegImageMetadata jpegMetadata = (JpegImageMetadata) metadata;
-
-        if (jpegMetadata.getExif() == null || jpegMetadata.getExif().getGPS() == null) {
-          TiffOutputSet outputSet = null;
-          final TiffImageMetadata exif = jpegMetadata.getExif();
-
-          if (null != exif) {
-            outputSet = exif.getOutputSet();
-          }
-
-          if (null == outputSet) {
-            outputSet = new TiffOutputSet();
-          }
-          outputSet.setGPSInDegrees(longitude, latitude);
-          int filenamePrefixIndex = photoLocalPath.lastIndexOf(".");
-          String geotaggedPhotoLocalPath = photoLocalPath.substring(0, filenamePrefixIndex)
-                  + "_geotagged" + photoLocalPath.substring(filenamePrefixIndex);
-
-          try (FileOutputStream fileOutputStream = new FileOutputStream(geotaggedPhotoLocalPath);
-               OutputStream outputStream = new BufferedOutputStream(fileOutputStream)) {
-            exifRewriter.updateExifMetadataLossless(inputFile, outputStream, outputSet);
-            logger.info("Geotag photo: {}, new path {}", photoLocalPath, geotaggedPhotoLocalPath);
-            return geotaggedPhotoLocalPath;
-          }
-        } else {
-          logger.info("Photo already has geotag {}", photoLocalPath);
-        }
-      }
-
-    } catch (ImageReadException | ImageWriteException | IOException e) {
-      logger.error("Fail to geotag photo {}", photoLocalPath, e);
+  private static TiffOutputSet getOrCreateOutputSet(TiffImageMetadata exif) throws ImageWriteException {
+    if (exif != null) {
+      return exif.getOutputSet();
     }
-    return photoLocalPath;
+    return new TiffOutputSet();
   }
 
-  public String appendUserComment(String photoLocalPath, String userComment) {
+  private static boolean addGps(TiffImageMetadata exif, TiffOutputSet outputSet,
+                                        Request request) throws ImageReadException, ImageWriteException {
+    if (request.latitude != null && request.longitude != null) {
+      if (exif == null || exif.getGPS() == null) {
+        outputSet.setGPSInDegrees(request.longitude, request.latitude);
+        logger.info("add geotag to {}", request.photoLocalPath);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean addUserComment(JpegImageMetadata jpegMetadata, TiffOutputSet outputSet,
+                                        Request request) throws ImageWriteException {
+    if (request.userComment != null) {
+      final TiffOutputDirectory exifDirectory = outputSet.getOrCreateExifDirectory();
+      TiffField field = jpegMetadata.findEXIFValueWithExactMatch(ExifTagConstants.EXIF_TAG_USER_COMMENT);
+      String input = request.userComment;
+      if (field != null) {
+        String existingUserComment = null;
+        try {
+          existingUserComment = field.getStringValue().trim();
+        } catch (ImageReadException e) {
+          logger.error("read existingUserComment fail", e);
+        }
+
+        if (StringUtils.isNotBlank(existingUserComment)) {
+          input = field.getValueDescription() + " " + input;
+        }
+      }
+      exifDirectory.removeField(ExifTagConstants.EXIF_TAG_USER_COMMENT);
+      exifDirectory.add(ExifTagConstants.EXIF_TAG_USER_COMMENT, input);
+      logger.info("add user comment \"{}\" to {}", input, request.photoLocalPath);
+      return true;
+    }
+    return false;
+  }
+
+  private static String getTaggedFilePath(String photoLocalPath) {
+    int filenamePrefixIndex = photoLocalPath.lastIndexOf(".");
+    return photoLocalPath.substring(0, filenamePrefixIndex)
+            + "_tagged" + photoLocalPath.substring(filenamePrefixIndex);
+  }
+
+  private void writeOutputSet(File inputFile, String taggedPhotoLocalPath,
+                              TiffOutputSet outputSet) throws IOException, ImageWriteException, ImageReadException {
+    try (FileOutputStream fileOutputStream = new FileOutputStream(taggedPhotoLocalPath);
+         OutputStream outputStream = new BufferedOutputStream(fileOutputStream)) {
+      exifRewriter.updateExifMetadataLossless(inputFile, outputStream, outputSet);
+      logger.info("tag photo: {}, new path {}", inputFile.getPath(), taggedPhotoLocalPath);
+    }
+  }
+
+  public String tagPhoto(Request request) {
+    String photoLocalPath = request.photoLocalPath;
     try {
       File inputFile = new File(photoLocalPath);
       final ImageMetadata metadata = Imaging.getMetadata(inputFile);
       if (metadata instanceof JpegImageMetadata) {
         final JpegImageMetadata jpegMetadata = (JpegImageMetadata) metadata;
-        TiffOutputSet outputSet = null;
         final TiffImageMetadata exif = jpegMetadata.getExif();
+        TiffOutputSet outputSet = getOrCreateOutputSet(exif);
 
-        if (null != exif) {
-          outputSet = exif.getOutputSet();
-        }
-
-        if (null == outputSet) {
-          outputSet = new TiffOutputSet();
-        }
-
-        final TiffOutputDirectory exifDirectory = outputSet.getOrCreateExifDirectory();
-        TiffField field = jpegMetadata.findEXIFValueWithExactMatch(ExifTagConstants.EXIF_TAG_USER_COMMENT);
-        String input = userComment;
-        if (field != null) {
-          String existingUserComment = null;
-          try {
-            existingUserComment = field.getStringValue().trim();
-          } catch (ImageReadException e) {
-            logger.error("read existingUserComment fail", e);
-          }
-
-          if (StringUtils.isNotBlank(existingUserComment)) {
-            input = field.getValueDescription() + " " + input;
-          }
-        }
-        exifDirectory.removeField(ExifTagConstants.EXIF_TAG_USER_COMMENT);
-        exifDirectory.add(ExifTagConstants.EXIF_TAG_USER_COMMENT, input);
-        int filenamePrefixIndex = photoLocalPath.lastIndexOf(".");
-        String taggedPhotoLocalPath = photoLocalPath.substring(0, filenamePrefixIndex)
-                + "_userCommentTagged" + photoLocalPath.substring(filenamePrefixIndex);
-
-        try (FileOutputStream fileOutputStream = new FileOutputStream(taggedPhotoLocalPath);
-             OutputStream outputStream = new BufferedOutputStream(fileOutputStream)) {
-          exifRewriter.updateExifMetadataLossless(inputFile, outputStream, outputSet);
-          logger.info("Append user comment photo: {}, new path {}", photoLocalPath, taggedPhotoLocalPath);
+        boolean changed = addGps(exif, outputSet, request) | addUserComment(jpegMetadata, outputSet, request);
+        if (changed) {
+          String taggedPhotoLocalPath = getTaggedFilePath(photoLocalPath);
+          writeOutputSet(inputFile, taggedPhotoLocalPath, outputSet);
           return taggedPhotoLocalPath;
         }
       }
@@ -116,6 +108,17 @@ public class ExifService {
       logger.error("Fail to append user comment to photo {}", photoLocalPath, e);
     }
     return photoLocalPath;
+  }
+
+  public static class Request {
+    public final String photoLocalPath;
+    public Float latitude;
+    public Float longitude;
+    public String userComment;
+
+    public Request(String photoLocalPath) {
+      this.photoLocalPath = photoLocalPath;
+    }
   }
 
 }
