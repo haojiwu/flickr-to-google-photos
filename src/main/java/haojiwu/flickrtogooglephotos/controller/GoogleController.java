@@ -13,7 +13,6 @@ import haojiwu.flickrtogooglephotos.model.GoogleCreateAlbumResult;
 import haojiwu.flickrtogooglephotos.model.GoogleCreatePhotoResult;
 import haojiwu.flickrtogooglephotos.model.GoogleCredential;
 import haojiwu.flickrtogooglephotos.model.Source;
-import haojiwu.flickrtogooglephotos.service.ExifService;
 import haojiwu.flickrtogooglephotos.service.GoogleService;
 import haojiwu.flickrtogooglephotos.service.IdMappingService;
 import org.slf4j.Logger;

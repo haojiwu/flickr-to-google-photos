@@ -20,21 +20,22 @@ def create_google_album(flickr_album):
     return r.json()
 
 album_page = 1 # set to 1 to star from beginning, or the to other to resume from other page
-google_album_num = 0
+success_google_album_count = 0
 while True:
     response = get_flickr_albums(album_page)
     #print(json.dumps(response, indent=2))
     print('album_page: {}, hasNext: {}'.format(album_page, response['hasNext']))
     flickr_albums = response['flickrAlbums']
     for flickr_album in flickr_albums:
-        print('google album num: {}'.format(google_album_num))
+        print('google album num: {}'.format(success_google_album_count))
         print(json.dumps(flickr_album, indent=2))
         create_response = create_google_album(flickr_album)
         print(json.dumps(create_response, indent=2))
-        google_album_num = google_album_num + 1
+        success_google_album_count = success_google_album_count + 1
 
     if (response['hasNext'] == False): # should be False. Set to True if you only want to try first page
         break
     else:
         album_page = album_page + 1
+print('success create {} google albums'.format(success_google_album_count))
 

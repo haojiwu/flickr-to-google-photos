@@ -33,7 +33,7 @@ public class RetryService {
   private static final int MAX_ATTEMPTS = 100;
   private static final long DELAY = 30000;
   private static final double MULTIPLIER = 2;
-  
+
   @Retryable(
           value = { IOException.class },
           maxAttempts = 10,
