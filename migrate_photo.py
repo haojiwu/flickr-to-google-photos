@@ -59,7 +59,7 @@ while True:
     result = create_google_photos_in_batch(flickr_photos)
     all_failed_flickr_photos.extend(result['failed'])
     all_non_unique_flickr_photos.extend(result['non_unique'])
-    if (response['hasNext'] == False): # should be False
+    if (response['hasNext'] == False): # should be False. Set to True if you only want to try first page
         break
     else:
         photo_page = photo_page + 1
