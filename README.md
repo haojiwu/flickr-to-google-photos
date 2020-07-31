@@ -1,43 +1,61 @@
 # Flickr to Google Photos
 Tool for photo and album migration from Flickr to Google Photos.
 
+## Table of Contents
+  * [Description](#description)
+  * [Build with](#build-with)
+  * [Prerequisites](#prerequisites)
+  * [Setup](#setup)
+  * [Quick start](#quick-start)
+  * [Usage](#usage)
+     * [Get Flickr credential](#get-flickr-credential)
+     * [Get Google credential](#get-google-credential)
+     * [Get Flickr photos metadata with download URL](#get-flickr-photos-metadata-with-download-url)
+     * [Create photo entities in Google Photos](#create-photo-entities-in-google-photos)
+     * [Get Flickr albums metadata with photo associations](#get-flickr-albums-metadata-with-photo-associations)
+     * [Create album in Google Photos](#create-album-in-google-photos)
+  * [Notes](#notes)
+     * [Video](#video)
+     * [Database](#database)
+     * [Performance](#performance)
+     * [Local photos](#local-photos)
+     * [Feedback](#feedback)
+
 ## Description
-This project implements following features to achieve migration from Flickr to Google Photos.
+This project implements the following features to achieve migration from Flickr to Google Photos.
 1. Flickr and Google oauth request builder and callback endpoint.
 2. RESTFul APIs to download all Flickr photos and upload to Google Photos, with following Flickr photo metadata:
    - Title
    - Description
    - Tags
-   - (above 3 metadata will be used to compose description in Google Photos.)
-   - Geotagging (add geotagging to photo's EXIF if user has manually added location in Flickr.)
-3. RESTFul APIs to get all Flickr albums, including album-photo assocations and album metadata, and create corresponding album in Google Photos with following Flickr album metadata:
+   - Geotagging (add geotagging to photo's EXIF if the user has manually added location in Flickr.)
+3. RESTFul APIs to get all Flickr albums, including album-photo associations and album metadata, and create corresponding album in Google Photos with following Flickr album metadata:
    - Title
-   - Description (as text enrichment to the beginning of Google Photos album.)
+   - Description
    - Cover photo
-4. Optinally force create unique photo in Google Photos by appending photo's EXIF.
-5. Support vidoe migration with limintation.
+4. Optionally force create unique photo in Google Photos by modifying photo's EXIF.
+5. Support video migration with limitations.
 
 ## Build with
 - Java 8
 - [Spring Boot](https://spring.io/projects/spring-boot)
 - Maven
-- [H2 Database](https://www.h2database.com) (Optional)
+- [H2 Database](https://www.h2database.com)
 - [Flickr4Java](https://github.com/boncey/Flickr4Java)
 - [google-photos-library-client](https://github.com/google/java-photoslibrary) [guide](https://developers.google.com/photos/library/guides/get-started-java#get-library)
 - [Apache Commons Imaging](https://github.com/apache/commons-imaging)
-
-There are also python scripts to demo sending request to migrate all photos and albums.
+- Python 2 or 3 and PIP (Optional for migration script only)
 
 ## Prerequisites
 - JDK 1.8+ and Maven 3.3+ installed
 - Your own Flickr app credential
-  1. Create app with any name in https://www.flickr.com/services/apps/create/noncommercial. After submitting, you will get **key** and **secret**.
+  1. Create an app with any name in https://www.flickr.com/services/apps/create/noncommercial. After submitting, you will get **key** and **secret**.
   2. Click **Edit auth flow for this app** and update **Callback URL** with `https://localhost:8443/flickr/auth/complete`. 
 - Your own Google App credential
   1. Create or config your Google project with Google Photos Library API. You can find more detailed instructions in https://developers.google.com/photos/library/guides/get-started.
   2. Update **Authorized redirect URI** with `https://localhost:8443/google/auth/complete`.
-- Generate a self-signed SSL certificate (if you don't have real SSL Certificate).  
-  Flickr oauth callback requires HTTPS URL. To enable HTTPS in Spring Boot we need SSL certificate. If you don't have one, you can generate self-signed SSL certificate. Of course it can only be used in local deployment.
+- Generate a self-signed SSL certificate (if you don't have a real SSL Certificate).  
+  Flickr oauth callback requires HTTPS URL. To enable HTTPS in Spring Boot we need an SSL certificate. If you don't have one, you can generate a self-signed SSL certificate. Of course it can only be used in local deployment.
   
   ```
   keytool -genkeypair -alias my_dev -keyalg RSA -keysize 2048 -storetype PKCS12 -keystore my_dev.p12 -validity 3650
@@ -47,16 +65,16 @@ There are also python scripts to demo sending request to migrate all photos and 
  
 
 ## Setup
-1. Clone this project to local. Go to project folder.
-```
-git clone git@github.com:haojiwu/flickr-to-google-photos.git
-cd flickr-to-google-photos
-```
-2. Create a folder (`/Users/dev/photos_from_flickr` as example) to temporarily store Flickr photo files in the local. Flickr photos will be downloaded to this folder and then upload to Google Photos. Although this is temporary storage, files in this folder will NOT be cleaned when migration completed or application shutdown. You can decide manually clean them or backup them to some other storage.
-```
-mkdir /Users/dev/photos_from_flickr
-```
-3. Copy keystore (`my_dev.p12` in previous example) to project folder.
+1. Clone this project to local. Go to the project folder.
+   ```
+   git clone git@github.com:haojiwu/flickr-to-google-photos.git
+   cd flickr-to-google-photos
+   ```
+2. Create a folder (`/Users/dev/photos_from_flickr` as example) to temporarily store Flickr photo files in the local. Flickr photos will be downloaded to this folder and then uploaded to Google Photos. Although this is temporary storage, files in this folder will NOT be cleaned when migration completed or application shutdown. You can decide to manually clean them or backup them to some other storage.
+   ```
+   mkdir /Users/dev/photos_from_flickr
+   ```
+3. Copy keystore (`my_dev.p12` in previous example) to the project folder.
 4. Configure project's application properties in `src/main/resources/application-dev.properties`.
    ``` 
    # you can use any editor or IDE to edit this file
@@ -68,84 +86,281 @@ mkdir /Users/dev/photos_from_flickr
    server.ssl.key-store-password=my_password  # the value you entered when keytool asked 
    server.ssl.key-alias=my_dev
    ```
-   - Add Flickr key and secret, which are from Flickr App you created.
+   - Add the Flickr key and secret, which are from the Flickr App you created.
    ```
    app.flickr.key=a1b234567b89c012d3e4f5ab67c8901d
    app.flickr.secret=12ab345c6d789e0f
    ```
-   - Add Google client id and client secret, which are from Google project you created with Google Photos Library enabled. [Here](https://developers.google.com/photos/library/guides/get-started) has detailed steps to find them.
+   - Add Google client id and client secret, which are from the Google project you created with Google Photos Library enabled. [Here](https://developers.google.com/photos/library/guides/get-started) are detailed steps to find them.
    ```
    app.google.clientId=123456789012-abcd3ef45g6h70ijkl89m0n1o2pqrstu.apps.googleusercontent.com
    app.google.clientSecret=12Ab3CDe4FGhIjklMnopQRST
    ```
-   - Add photo folder. Put the path from step 2.
+   - Add the photo folder. Put the path from step 2.
    ```
    app.photoFolder=/Users/dev/photos_from_flickr
    ```
 5. In the project folder launch application.
-```
-./mvnw spring-boot:run
-```
+   ```
+   ./mvnw spring-boot:run
+   ```
+## Quick start
+Script to migrate all photos and albums
+1. Open browser to visit `https://localhost:8443/flickr/auth`. After authorization flow you will have Flickr credential.
+2. Open browser to visit `https://localhost:8443/google/auth`. After authorization flow you will have Google credential.
+3. Make sure your environment has python and [PIP](https://pip.pypa.io/en/stable/).
+4. Install python library `Requests`.
+   ```
+   pip install requests
+   ```
+5. Edit `migrate_photo.py` and `migrate_album.py` in the project folder to add Google credential and Flickr credential.
+   ```
+   flickr_token = "12345678901234567-1234abc5d6e7890f"
+   flickr_secret = "1fa234b56c78de90"
+   flickr_user_id = "12345678@N00"
+   google_refresh_token = "1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"
+   ```
+6. Execute script to migrate photos.
+   ```
+   python migrate_photo.py
+   ```
+7. Execute script to migrate albums.
+   ```
+   python migrate_album.py
+   ```
 
 ## Usage
+
 ### Get Flickr credential
 1. Open browser to visit `https://localhost:8443/flickr/auth`.
-2. Browser will be redirected to Flickr authorization page.
-3. After you accept it, browser will be redirected back to `https://localhost:8443/flickr/auth/complete` and returns `FlickrCredential` which contains `userId`, `token` and `secret`.
-```
-{
-    "userId": "12345678@N00",
-    "token": "12345678901234567-1234abc5d6e7890f",
-    "secret": "1fa234b56c78de90"
-}
-```
+2. Browser will be redirected to the Flickr authorization page.
+3. After you accept it, the browser will be redirected back to `https://localhost:8443/flickr/auth/complete` and return `FlickrCredential` which contains `userId`, `token` and `secret`.
+   ```
+   {
+       "userId": "12345678@N00",
+       "token": "12345678901234567-1234abc5d6e7890f",
+       "secret": "1fa234b56c78de90"
+   }
+   ```
 ### Get Google credential
 1. Open browser to visit `https://localhost:8443/google/auth`.
-2. Browser will be redirected to Google authorization page. There may be warning like `This app isn't verified`. Ignore it by cliecking `Advanced` and `Go to` your app.
-3. After you allow authorization with permissions, browser will be redirected back to `https://localhost:8443/google/auth/complete` and returns `GoogleCredential` which contains `accessToken` and `refreshToken`. We only need `refreshToken`.
-```
-{
-    "accessToken": "ya12.a3AfH4SMCPonW5F6VHAH7L_oGsb0NwTgDCQQElPrG-8H90flJatx1RELxHPf12ydBKSwi-WH34mHh56jJFU7z89bayrvogNX-Z0PEdmM1gLMQWGfLW23yqbCStvsYp4gcJ5n6cox_nVc7rfGan8SfRiSwtqhg9Kik0Szo",
-    "refreshToken": "1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"
-}
-```
-### Get Flickr photos metadata with downloadable URL
+2. Browser will be redirected to Google authorization page. There may be a warning like `This app isn't verified`. Ignore it by clicking `Advanced` and `Go to` your app.
+3. After you allow authorization with permissions, the browser will be redirected back to `https://localhost:8443/google/auth/complete` and return `GoogleCredential` which contains `accessToken` and `refreshToken`. We only need `refreshToken`.
+   ```
+   {
+       "accessToken": "ya12.a3AfH4SMCPonW5F6VHAH7L_oGsb0NwTgDCQQElPrG-8H90flJatx1RELxHPf12ydBKSwi-WH34mHh56jJFU7z89bayrvogNX-Z0PEdmM1gLMQWGfLW23yqbCStvsYp4gcJ5n6cox_nVc7rfGan8SfRiSwtqhg9Kik0Szo",
+       "refreshToken": "1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"
+   }
+   ```
+### Get Flickr photos metadata with download URL
 - Endpoint: `https://localhost:8443/flickr/photo`
+- Method: GET
 - Parameters:
-  - `token`: Flickr token from Flickr Credential.
-  - `secret`: Flickr secret from Flickr Credential.
-  - `page`: page number starting from **1** (it is not programmer friendly, but follows Flickr API's design). Each page has 500 photos.
-```bash
-# token: 12345678901234567-1234abc5d6e7890f
-# secret: 1fa234b56c78de90
-# page: 1
-# add "-k" to ignore SSL verification 
-curl -k "https://localhost:8443/flickr/photo?token=12345678901234567-1234abc5d6e7890f&secret=1fa234b56c78de90&page=1"
-{
-    "flickrPhotos": [ # Array of Flickr photos. If this is not last page, the array will have 500 elements.
-        {
-            "id": "12345678901", # Flickr photo id
-            "url": "https://flickr.com/photos/12345678@N00/12345678901", # Flickr URL of this photo
-            "downloadUrl": "https://farm66.staticflickr.com/65535/12345678901_af1ccf9d71_o.jpg", # URL to download this photo
-            "title": "My photo title", # Flickr photo title
-            "description": "My photo description", # Flickr photo description
-            "latitude": 40.707294, # GPS latitude of Flickr photo geotagging 
-            "longitude": -74.01037, # GPS longitude of Flickr photo geotagging 
-            "tags": [ # Array of Flickr tag string 
-                "tag1",
-                "tag2"
-            ],
-            "media": "PHOTO" # PHOTO or VIDEO (both are uppercase)
-        },
-        ...
-    ],
-    "total": 13110, # Number of total photos in Flickr
-    "page": 1, # Page number
-    "pageSize": 500, # Page size
-    "hasNext": true # Boolean Flag to tell if this is last page, or user need to send another request with next page number.
-}        
-```
-### Create photos in Google Photos
+  - `token`: Flickr token from Flickr credential.
+  - `secret`: Flickr secret from Flickr credential.
+  - `page`: Page number starting from **1** (it is not programmer friendly, but follows Flickr API's design). Each page has 500 photos.
+  ```bash
+  # token: 12345678901234567-1234abc5d6e7890f
+  # secret: 1fa234b56c78de90
+  # page: 1
+  # add "-k" to ignore SSL verification 
+  curl -k -X GET "https://localhost:8443/flickr/photo?token=12345678901234567-1234abc5d6e7890f&secret=1fa234b56c78de90&page=1"
+  {
+      "flickrPhotos": [ # Array of Flickr photos. If this is not last page, the array will have 500 elements.
+          {
+              "id": "12345678901", # Flickr photo id
+              "url": "https://flickr.com/photos/12345678@N00/12345678901", # Flickr URL of this photo
+              "downloadUrl": "https://farm66.staticflickr.com/65535/12345678901_af1ccf9d71_o.jpg", # URL to download this photo
+              "title": "My photo title", # Flickr photo title
+              "description": "My photo description", # Flickr photo description
+              "latitude": 40.707294, # GPS latitude of Flickr photo geotagging 
+              "longitude": -74.01037, # GPS longitude of Flickr photo geotagging 
+              "tags": [ # Array of Flickr photo tags
+                  "tag1",
+                  "tag2"
+              ],
+              "media": "PHOTO" # PHOTO or VIDEO (both are uppercase)
+          },
+          ...
+      ],
+      "total": 13110, # Number of total photos in Flickr
+      "page": 1, # Page number
+      "pageSize": 500, # Page size
+      "hasNext": true # Boolean flag to tell if this is last page, or user needs to send another request with next page number.
+  }        
+  ```
+### Create photo entities in Google Photos
+- Endpoint: `https://localhost:8443/google/photo`
+- Method: POST
+- Parameters:
+  - `refreshToken`: Google refresh token token from Google credential.
+  - `forceUnique`: Optional boolean flag to add unique string (timestamp) to UserComment field in EXIF to make photo unique in terms of checksum. By default it is `false`.
+- Body: Json array of objects with Flickr photo metadata and download URL (the same as `flickrPhotos` field in `/flickr/photo` response). The max size of this array is 50, which is Google Photo API limit.
+  ```bash
+  #refreshToken: 1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza
+  curl -k -X POST \
+    'https://localhost:8443/google/photo?refreshToken=1%2F%2F23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza \
+    -H 'content-type: application/json' \
+    -d '[
+          {
+              "id": "12345678901",
+              "url": "https://flickr.com/photos/12345678@N00/12345678901",
+              "downloadUrl": "https://farm66.staticflickr.com/65535/12345678901_af1ccf9d71_o.jpg",
+              "title": "My photo title",
+              "description": "My photo description",
+              "latitude": 40.707294,
+              "longitude": -74.01037,
+              "tags": [
+                  "tag1",
+                  "tag2"
+              ],
+              "media": "PHOTO"
+          },
+          ...
+  ]'
+  ```
+  Response:
+  ```bash
+  [
+      {
+          "status": "SUCCESS", # Status of each photo entity creation in Google Photos. See below section for more details.
+          "sourceId": "12345678901", # input Flickr photo id
+          "googleId": "AMKSlC6DzJYXaLb1Qak6VYO8YstHDuTaT9xzDSUaCt1sk4LsfdqIUj6FLWbUNtLBme5mouk8ciuP9rnPltvvIPLYT_CVkWW2Dg", # Google Photos photo id
+          "url": "https://photos.google.com/photo/AF1QipNDVDsbAMs_tOjwYNpwZpu_SM5ZHr1pU6_La10", # Google Photos photo URL
+          "error": null # Error message if exists
+      },
+      ...
+  ]
+  ```
+#### Response status
+- `SUCCESS`: Successfully create photo entity in Google Photos.
+  - Created photo entity can be accessed by `url` field.
+- `EXIST_NO_NEED_TO_CREATE`: This Flickr photo entity was created by our app in Google Photos before.
+  - To reduce Google Photo API calls, if a Flickr id exists in the id mapping database, it means this Flickr photo entity had been migrated before and we don't want to waste resources to do it again.
+- `EXIST_CAN_NOT_CREATE`: Photo already exists in Google Photos, but it was NOT created by this Flickr photo entity.
+  - For *the same* photo (in terms of photo file checksum) Google Photos only keeps one photo entity. It is different from Flickr which we can upload the same photo multiple times and create separated photo entities with different metadata. 
+  - When this status is returned, it means *the same* photo has been uploaded by either user manually, by another app, or even by our app when processing different Flickr photo entity of the same photo file. The result is the photo file of this Flickr photo entity exists in Google Photos, but its metadata doesn't. It will not be added to any migrated album, either.
+  - If you want to force every Flickr photo entity to be created in Google Photos with metadata, you can submit request again with `forceUnique=true`, which will add unique string (like `flickr-to-google-photos 2020-07-30 18:07:19.286`) to UserComment field in EXIF of the photo file in order to change photo file checksum. Google Photos will create another entity for this unique photo.
+- `FAIL`: Fail to create photo entity in Google Photos.
+  - Check `error` to troubleshooting.
+#### Created photo metadata in Google Photos  
+- Description is composed in this format
+  ```
+  My photo title
+  My full long photo description
+  #tag1 #tag2 #tag3
+  ```
+- Filename is Flickr URL like `https://flickr.com/photos/12345678@N00/12345678901`
+- If Flickr photo has geotag, Google Photos embed a Google Map to show the location.
+- This photo is added to the album `Photos from Flickr` which is also created by our app.
+
 ### Get Flickr albums metadata with photo associations
+- Endpoint: `https://localhost:8443/flickr/album`
+- Method: GET
+- Parameters:
+  - `token`: Flickr token from Flickr credential.
+  - `secret`: Flickr secret from Flickr credential.
+  - `userId`: Flickr userId from Flickr credential.
+  - `page`: Page number starting from **1**.
+  - `pageSize`: Optional page size, which is number of albums will be returned for each request. Default value is `5`. If `pageSize` is too large, this API will be slow since it will get **all photo ids** of those albums.
+  ```bash
+  # token: 12345678901234567-1234abc5d6e7890f
+  # secret: 1fa234b56c78de90
+  # userId: 12345678@N00
+  # page: 1
+  curl -k -X GET "https://localhost:8443/flickr/album?token=12345678901234567-1234abc5d6e7890f&secret=1fa234b56c78de90&userId=12345678%40N00&page=1"
+  {
+      "flickrAlbums": [ # Array of Flickr albums.
+          {
+              "id": "12345678901234567", # Flickr album id
+              "title": "My album title", # Flickr album title
+              "description": "My album description", # Flickr album description
+              "url": "https://www.flickr.com/photos/12345678@N00/sets/12345678901234567/", # Flickr URL of this album
+              "coverPhotoId": "12345678901", # hoto id of this album's cover photo
+              "photoIds": [
+                  "98765432109",
+                  "12345678901",
+                  ...
+              ]
+          },
+          ...
+      ],
+      "total": 187, # Number of total albums in Flickr
+      "page": 1,  # Page number
+      "pageSize": 5, # Page size
+      "hasNext": true # Boolean flag to tell if this is last page, or user needs to send another request with next page number.
+  }        
+  ```
 ### Create album in Google Photos
-### Scripts to migration all photos and albums
+- Endpoint: `https://localhost:8443/google/album`
+- Method: POST
+- Parameters:
+  - `refreshToken`: Google refresh token token from Google credential.
+- Body: Json object with Flickr album metadata with photo associations (the same as element in `flickrAlbums` field in `/flickr/album` response).
+  ```bash
+  #refreshToken: 1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza
+  curl -k -X POST \
+    'https://localhost:8443/google/album?refreshToken=1%2F%2F23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza \
+    -H 'content-type: application/json' \
+    -d '{
+              "id": "12345678901234567", 
+              "title": "My album title", 
+              "description": "My album description", 
+              "url": "https://www.flickr.com/photos/12345678@N00/sets/12345678901234567/",
+              "coverPhotoId": "12345678901",
+              "photoIds": [
+                  "98765432109",
+                  "12345678901",
+                  ...
+              ]
+  }'
+  ```
+  Response:
+  ```bash
+  {
+      "id": "AKp5zQyVDF5L5QZkZfwR8k41uVZSAp3fRWOMw0PQs6PzgrLhzyWGlqZuFTKOl9Yv5rGwtCysmeR0", # Google Photos album id
+      "url": "https://photos.google.com/lr/album/AKp5zQyVDF5L5QZkZfwR8k41uVZSAp3fRWOMw0PQs6PzgrLhzyWGlqZuFTKOl9Yv5rGwtCysmeR0", # Google Photos album URL
+      "itemCount": 24, # Number of photos added to this album
+      "failedSourcePhotoIds": [ # Array of Flickr photo ids which are failed to add to Google Photos album.
+          "98765432109",
+          ...
+      ]
+  }
+  ```
+#### Photo ids that are failed to add to Google Photos album
+
+All Flickr photos must be created in Google Photos first, then start to migrate Flickr albums. For failed Flickr photo ids, make sure they are already migrated and exists in id mapping database.
+
+
+#### Created album metadata in Google Photos  
+- Album title is the same as the Flickr album title.
+- Album cover photo is the same as the Flickr album cover.
+- A text enrichment will be composed with description of Flickr album and Flickr album URL.
+- Photos are in the same order as Flickr album.
+
+## Notes
+### Video
+Besides photos, our application also migrates videos from Flickr to Google Photos with some limitations: 
+- Flickr API doesn't provide original video. Therefore only MP4 encoded video can be migrated.
+- Only videos with public access can be migrated.
+- Video will not be geotagged.
+
+### Database
+This project uses H2 database to store id mappings between Flickr and Google Photos. H2 can be accessed by visiting `https://localhost:8443/h2-console/`.
+
+By default H2 is only in memory and will be reset after the application process restart. To persist id mapping, you can add these config in `application-dev.properties`.
+```
+spring.datasource.url=jdbc:h2:file:/you/local/path/myh2db
+spring.jpa.hibernate.ddl-auto=update
+```
+After the application process starts, `myh2db.mv.db` will be created.
+
+### Performance
+Google API sets a quota to limit the number of write API calls per minute. Our application leverages [Sptring Retry](https://www.baeldung.com/spring-retry) with exponential backoff starting from 30 seconds. It makes this API sometimes very slow if retry happens a lot.
+
+### Local Photos
+- Flickr photos will be downloaded and stored in the folder you specified in `app.photoFolder` in the application properties. If this file's EXIF is modified by our application, either adding geotagging or UserComment, a new file will be created with suffix `_taggeed` in filename.
+- Since our application doesn't clean photo files, make sure your local disk has enough free space when you start to migrate a lot of photos.
+
+## Feedback
+Any feedback or bug report are welcome. For more information about this project please check my blog https://haojiwu.wordpress.com/category/flickr-to-google-photos/.
