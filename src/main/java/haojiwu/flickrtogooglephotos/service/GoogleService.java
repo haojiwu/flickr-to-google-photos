@@ -204,10 +204,10 @@ public class GoogleService {
     if (sourcePhoto.getMedia() == FlickrPhoto.Media.VIDEO) {
       filename = sourcePhoto.getId() + ".mp4";
     } else { // photo
-      filename = sourcePhoto.getPhotoUrl().substring(sourcePhoto.getPhotoUrl().lastIndexOf("/"));
+      filename = sourcePhoto.getDownloadUrl().substring(sourcePhoto.getDownloadUrl().lastIndexOf("/"));
     }
     String localPath = photoFolder + "/" + filename;
-    retryService.downloadFile(sourcePhoto.getPhotoUrl(), localPath);
+    retryService.downloadFile(sourcePhoto.getDownloadUrl(), localPath);
     return localPath;
   }
 
@@ -410,7 +410,7 @@ public class GoogleService {
       String uploadToken = uploadResponse.getUploadToken().get();
       logger.info("upload success with uploadToken {}, photoLocalPath: {}", uploadToken, photoLocalPath);
       String itemDescription = buildItemDescription(sourcePhoto);
-      return NewMediaItemFactory.createNewMediaItem(uploadToken, sourcePhoto.getFlickrUrl(), itemDescription);
+      return NewMediaItemFactory.createNewMediaItem(uploadToken, sourcePhoto.getUrl(), itemDescription);
     }
   }
 

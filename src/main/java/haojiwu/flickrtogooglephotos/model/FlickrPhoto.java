@@ -6,8 +6,8 @@ import java.util.List;
 
 public class FlickrPhoto {
   private final String id;
-  private final String flickrUrl;
-  private final String photoUrl;
+  private final String url;
+  private final String downloadUrl;
   private final String title;
   private final String description;
   private final Float latitude;
@@ -20,11 +20,11 @@ public class FlickrPhoto {
     VIDEO
   }
 
-  private FlickrPhoto(String id, String flickrUrl, String photoUrl, String title,
-                     String description, Float latitude, Float longitude, List<String> tags, Media media) {
+  private FlickrPhoto(String id, String url, String downloadUrl, String title,
+                      String description, Float latitude, Float longitude, List<String> tags, Media media) {
     this.id = id;
-    this.flickrUrl = flickrUrl;
-    this.photoUrl = photoUrl;
+    this.url = url;
+    this.downloadUrl = downloadUrl;
     this.title = title;
     this.description = description;
     this.latitude = latitude;
@@ -37,12 +37,12 @@ public class FlickrPhoto {
     return id;
   }
 
-  public String getFlickrUrl() {
-    return flickrUrl;
+  public String getUrl() {
+    return url;
   }
 
-  public String getPhotoUrl() {
-    return photoUrl;
+  public String getDownloadUrl() {
+    return downloadUrl;
   }
 
   public String getTitle() {
@@ -73,8 +73,8 @@ public class FlickrPhoto {
   public String toString() {
     return MoreObjects.toStringHelper(this)
             .add("id", id)
-            .add("flickrUrl", flickrUrl)
-            .add("photoUrl", photoUrl)
+            .add("url", url)
+            .add("downloadUrl", downloadUrl)
             .add("title", title)
             .add("description", description)
             .add("latitude", latitude)
@@ -86,8 +86,8 @@ public class FlickrPhoto {
 
   public static class Builder {
     private String id;
-    private String flickrUrl;
-    private String photoUrl;
+    private String url;
+    private String downloadUrl;
     private String title;
     private String description;
     private Float latitude;
@@ -99,7 +99,7 @@ public class FlickrPhoto {
     }
 
     public FlickrPhoto build() {
-      return new FlickrPhoto(id, flickrUrl, photoUrl, title, description, latitude, longitude, tags, media);
+      return new FlickrPhoto(id, url, downloadUrl, title, description, latitude, longitude, tags, media);
     }
 
     public Builder setId(String id) {
@@ -107,13 +107,13 @@ public class FlickrPhoto {
       return this;
     }
 
-    public Builder setFlickrUrl(String flickrUrl) {
-      this.flickrUrl = flickrUrl;
+    public Builder setUrl(String url) {
+      this.url = url;
       return this;
     }
 
-    public Builder setPhotoUrl(String photoUrl) {
-      this.photoUrl = photoUrl;
+    public Builder setDownloadUrl(String downloadUrl) {
+      this.downloadUrl = downloadUrl;
       return this;
     }
 

@@ -85,7 +85,7 @@ public class FlickrController {
     FlickrPhoto.Media media = FlickrPhoto.Media.valueOf(photo.getMedia().toUpperCase());
     FlickrPhoto.Builder builder = new FlickrPhoto.Builder()
             .setId(photo.getId())
-            .setFlickrUrl(photo.getUrl())
+            .setUrl(photo.getUrl())
             .setTitle(photo.getTitle())
             .setDescription(photo.getDescription())
             .setMedia(media);
@@ -102,24 +102,24 @@ public class FlickrController {
               .setLongitude(photo.getGeoData().getLongitude());
     }
 
-    String photoUrl;
+    String downloadUrl;
     if (media == FlickrPhoto.Media.VIDEO) {
-      photoUrl = photo.getVideoOriginalUrl();
+      downloadUrl = photo.getVideoOriginalUrl();
     } else { // media == "photo"
       try {
-        photoUrl = photo.getOriginalUrl();
+        downloadUrl = photo.getOriginalUrl();
       } catch (FlickrException e) { // should never happen
         if (photo.getLarge2048Size() != null) {
           // https://www.flickr.com/services/api/misc.urls.html
           // Large 2048 only exists after March 1st 2012
-          photoUrl = photo.getLarge2048Url();
+          downloadUrl = photo.getLarge2048Url();
         } else {
-          photoUrl = photo.getLargeUrl();
+          downloadUrl = photo.getLargeUrl();
         }
-        logger.error("getOriginalUrl fail, use large url instead {}", photoUrl, e);
+        logger.error("getOriginalUrl fail, use large url instead {}", downloadUrl, e);
       }
     }
-    builder.setPhotoUrl(photoUrl);
+    builder.setDownloadUrl(downloadUrl);
     return builder.build();
   }
 
