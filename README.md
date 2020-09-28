@@ -1,5 +1,9 @@
 # Flickr to Google Photos
-Tool for photo and album migration from Flickr to Google Photos.
+Tool for photo and album migration from Flickr to Google Photos. Photo metadata like title, dscription, tag and geotag will also be migrated.
+
+Example:
+
+![Google Photo migration example](images/google_photo_example.png)
 
 ## Table of Contents
   * [Description](#description)
