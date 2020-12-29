@@ -43,6 +43,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.text.SimpleDateFormat;
@@ -68,6 +69,8 @@ public class GoogleService {
   @Value("${app.photoFolder}")
   private String photoFolder;
 
+  @Value("${app.deleteLocalFile:true}")
+  private boolean deleteLocalFile;
 
   @Autowired
   private IdMappingService idMappingService;
@@ -223,12 +226,14 @@ public class GoogleService {
               .setGoogleId(existingSourceIdToGoogleId.get(sourceId))
               .build();
     }
+    String photoLocalPathDownloaded = null;
+    String photoLocalPath = null;
     try {
       PhotosLibraryClient photosLibraryClient = getPhotosLibraryClient(refreshToken);
 
-      String photoLocalPath = downloadPhoto(sourcePhoto);
+      photoLocalPathDownloaded = downloadPhoto(sourcePhoto);
 
-      ExifService.Request request = new ExifService.Request(photoLocalPath);
+      ExifService.Request request = new ExifService.Request(photoLocalPathDownloaded);
       if (sourcePhoto.getMedia() == FlickrPhoto.Media.PHOTO
               && sourcePhoto.getLatitude() != null
               && sourcePhoto.getLongitude() != null) {
@@ -254,6 +259,15 @@ public class GoogleService {
               .setStatus(GoogleCreatePhotoResult.Status.FAIL)
               .setError(e.getMessage())
               .build();
+    } finally {
+      if (deleteLocalFile) {
+        if (photoLocalPath != null) {
+          new File(photoLocalPath).delete();
+        }
+        if (photoLocalPathDownloaded != null && !StringUtils.equals(photoLocalPathDownloaded, photoLocalPath)) {
+          new File(photoLocalPathDownloaded).delete();
+        }
+      }
     }
   }
 
