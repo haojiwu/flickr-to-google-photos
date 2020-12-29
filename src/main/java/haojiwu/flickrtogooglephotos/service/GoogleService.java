@@ -233,19 +233,22 @@ public class GoogleService {
 
       photoLocalPathDownloaded = downloadPhoto(sourcePhoto);
 
-      ExifService.Request request = new ExifService.Request(photoLocalPathDownloaded);
-      if (sourcePhoto.getMedia() == FlickrPhoto.Media.PHOTO
-              && sourcePhoto.getLatitude() != null
-              && sourcePhoto.getLongitude() != null) {
-        request.latitude = sourcePhoto.getLatitude();
-        request.longitude = sourcePhoto.getLongitude();
-      }
+      if (sourcePhoto.getMedia() == FlickrPhoto.Media.PHOTO) {
+        ExifService.Request request = new ExifService.Request(photoLocalPathDownloaded);
+        if (sourcePhoto.getLatitude() != null
+                && sourcePhoto.getLongitude() != null) {
+          request.latitude = sourcePhoto.getLatitude();
+          request.longitude = sourcePhoto.getLongitude();
+        }
 
-      if (forceUnique) {
-        request.userComment = "flickr-to-google-photos " +  DATE_FORMAT.format(new Date());
-      }
+        if (forceUnique) {
+          request.userComment = "flickr-to-google-photos " +  DATE_FORMAT.format(new Date());
+        }
 
-      photoLocalPath = exifService.tagPhoto(request);
+        photoLocalPath = exifService.tagPhoto(request);
+      } else {
+        photoLocalPath = photoLocalPathDownloaded;
+      }
 
       NewMediaItem newMediaItem = uploadPhotoAndCreateNewMediaItem(photosLibraryClient, sourcePhoto, photoLocalPath);
 
