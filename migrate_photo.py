@@ -1,11 +1,6 @@
 import requests
 import json
-
-host = "https://localhost:8443"
-flickr_token = "my flickr token from https://localhost:8443/auth/flickr/complete"
-flickr_secret = "my flickr secret from https://localhost:8443/auth/flickr/complete"
-flickr_user_id = "my flickr user id from https://localhost:8443/auth/flickr/complete"
-google_refresh_token = "my google refreshToken from https://localhost:8443/auth/google/complete"
+import argparse
 
 def get_flickr_photos(page):
     url = host + "/flickr/photo"
@@ -18,9 +13,6 @@ def create_google_photos(flickr_photos_batch, force_unique):
     params = {'refreshToken': google_refresh_token, 'forceUnique': force_unique}
     r = requests.post(url=url, json=flickr_photos_batch, params=params, verify=False)
     return r.json()
-
-photo_page = 1 # set to 1 to star from beginning, or the to other to resume from other page
-google_batch_size = 50 # Google Photo API only allows max 50 as batch size
 
 def create_google_photos_in_batch(flickr_photos, force_unique='false'):
     google_batch_num = 0
@@ -48,6 +40,26 @@ def create_google_photos_in_batch(flickr_photos, force_unique='false'):
     ret['non_unique'] = [photo for photo in flickr_photos if photo['id'] in non_unique_flickr_photo_ids]
 
     return ret
+
+# main()
+parser = argparse.ArgumentParser()
+parser.add_argument("--host", help='Host URL, like "https://localhost:8443" or "https://my-flickr-to-google-photos.onrender.com"', required=True)
+parser.add_argument("--flickr-token", help='Flickr token from https://[HOST]/auth/flickr/complete, like "12345678901234567-1234abc5d6e7890f"', required=True)
+parser.add_argument("--flickr-secret", help='Flickr secret from https://[HOST]/auth/flickr/complete, like "1fa234b56c78de90"', required=True)
+parser.add_argument("--flickr-user-id", help='Flickr user id from https://[HOST]/auth/flickr/complete, like "12345678@N00"', required=True)
+parser.add_argument("--google-refresh-token", help='Google refreshToken from https://[HOST]/auth/google/complete, like ' +
+                        '"1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"', required=True)
+
+args = parser.parse_args()
+
+host = args.host
+flickr_token = args.flickr_token
+flickr_secret = args.flickr_secret
+flickr_user_id = args.flickr_user_id
+google_refresh_token = args.google_refresh_token
+
+photo_page = 1 # set to 1 to star from beginning, or the to other to resume from other page
+google_batch_size = 50 # Google Photo API only allows max 50 as batch size
 
 all_failed_flickr_photos = []
 all_non_unique_flickr_photos = []
