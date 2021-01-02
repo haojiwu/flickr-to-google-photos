@@ -1,0 +1,35 @@
+databases:
+ - name: my-flickr-to-google-photos-db
+  ipAllowList: []
+
+services:
+ - type: web
+   name: my-flickr-to-google-photos
+   env: docker
+   dockerfilePath: ./Dockerfile.render
+   autoDeploy: true
+   envVars:
+     - key: DB_HOST
+       fromDatabase:
+         name: my-flickr-to-google-photos-db
+         property: host
+     - key: DB_NAME
+       fromDatabase:
+         name: my-flickr-to-google-photos-db
+         property: database
+     - key: DB_USERNAME
+       fromDatabase:
+         name: my-flickr-to-google-photos-db
+         property: user
+     - key: DB_PASSWORD
+       fromDatabase:
+         name: my-flickr-to-google-photos-db
+         property: password
+     - key: FLICKR_KEY
+       sync: false
+     - key: FLICKR_SECRET
+       sync: false
+     - key: GOOGLE_CLIENT_ID
+       sync: false
+     - key: GOOGLE_CLIENT_SECRET
+       sync: false
