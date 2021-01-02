@@ -4,6 +4,12 @@ COPY ./ ./
 RUN mvn clean package
 
 FROM openjdk:8-jre
+RUN apt-get update && apt-get -y upgrade \
+ && apt-get install -y python3 \
+ && apt-get install -y python3-pip \
+ && pip3 install requests \
+ && apt-get install -y postgresql-client
 WORKDIR /app
+COPY *.py ./
 COPY --from=MAVEN_BUILD /build/target/flickr-to-google-photos-0.0.1-SNAPSHOT.jar ./app.jar
 CMD ["java", "-Dspring.profiles.active=render", "-jar", "./app.jar"]
