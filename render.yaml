@@ -1,5 +1,5 @@
 databases:
- - name: my-flickr-to-google-photos-db
+- name: my-flickr-to-google-photos-db
   ipAllowList: []
 
 services:
