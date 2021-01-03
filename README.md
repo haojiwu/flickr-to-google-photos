@@ -370,14 +370,18 @@ Besides photos, our application also migrates videos from Flickr to Google Photo
 - Video will not be geotagged.
 
 ### Database
-This project uses H2 database to store id mappings between Flickr and Google Photos. H2 can be accessed by visiting `https://localhost:8443/h2-console/`.
-
-By default H2 is only in memory and will be reset after the application process restart. To persist id mapping, you can add these config in `application-dev.properties`.
-```
-spring.datasource.url=jdbc:h2:file:/you/local/path/myh2db
-spring.jpa.hibernate.ddl-auto=update
-```
-After the application process starts, `myh2db.mv.db` will be created.
+This project use H2 database (in memory or disk) or PostgreSQL database to store id mappings between Flickr and Google Photos.
+- H2 database
+  H2 can be accessed by visiting `https://localhost:8443/h2-console/`. By default H2 is only in memory and will be reset after the application process restart. To persist id mapping, you can add these config in `application-dev.properties`.
+  ```
+  spring.datasource.url=jdbc:h2:file:/you/local/path/myh2db
+  spring.jpa.hibernate.ddl-auto=update
+  ```
+  After the application process starts, `myh2db.mv.db` will be created.
+  For docker deployment it needs to mount volume as persistent disk. In the `application-docker.properties` H2 file path is `/db/myh2db`. Docker container will mount `/db` with this argument `--mount source=db,target=/db`
+  
+- PostgreSQL database
+  For Render deployment this project uses PostgreSQL since Render provides fully managed PostgreSQL.
 
 ### Performance
 Google API sets a quota to limit the number of write API calls per minute. Our application leverages [Sptring Retry](https://www.baeldung.com/spring-retry) with exponential backoff starting from 30 seconds. It makes this API sometimes very slow if retry happens a lot.
