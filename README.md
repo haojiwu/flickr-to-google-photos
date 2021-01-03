@@ -76,12 +76,15 @@ You can deploy flickr-to-google-photos to [Render](https://render.com/) with one
 [![Deploy to Render](http://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
 Render will prompt to request you to enter `FLICKR_KEY` and `FLICKR_SECRET` from your Flickr app and `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from your Google app as environment variables. 
+
 ![Render YAML environment variables](images/render_yaml_env_var.png)
 
 It is all set. In the new created `my-flickr-to-google-photos-XXXX (XXXX is random string)` web service there will be URL like `https://my-flickr-to-google-photos-XXXX.onrender.com`. This is API endpoint you can use to do Flickr and Google authorization and migrate photos and albumes. Remember to update **Callback URL** in your Flickr app and **Authorized redirect URI** in your Google App with this API endpoint.
 
 [Dockerfile.render](Dockerfile.render) contains python and PostgreSQL client. You can execute migration script in this service's web shell:
+
 ![Render web shell](images/render_web_shell.png)
+
 ```
 python3 migrate_photo.py --host "https://my-flickr-to-google-photos-XXXX.onrender.com" --flickr-token "12345678901234567-1234abc5d6e7890f" --flickr-secret "1fa234b56c78de90" --flickr-user-id "12345678@N00" --google-refresh-token "1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"
 ```
@@ -94,16 +97,8 @@ python3 migrate_photo.py --host "https://my-flickr-to-google-photos-XXXX.onrende
    git clone git@github.com:haojiwu/flickr-to-google-photos.git
    cd flickr-to-google-photos
    ```
-2. Create a folder (`/Users/dev/photos_from_flickr` as example) to temporarily store Flickr photo files in the local. Flickr photos will be downloaded to this folder and then uploaded to Google Photos. Although this is temporary storage, files in this folder will NOT be cleaned when migration completed or application shutdown. You can decide to manually clean them or backup them to some other storage.
-   ```
-   mkdir /Users/dev/photos_from_flickr
-   ```
-3. Copy keystore (`my_dev.p12` in previous example) to the project folder.
-4. Configure project's application properties in `src/main/resources/application-dev.properties`.
-   ``` 
-   # you can use any editor or IDE to edit this file
-   vim src/main/resources/application-dev.properties
-   ```   
+2. Copy keystore (`my_dev.p12` in previous example) to the project folder.
+3. Configure project's application properties in `src/main/resources/application-dev.properties` or `src/main/resources/application-docker.properties`.
    - Add SSL properties.
    ```
    server.ssl.key-store=my_dev.p12 # make sure you put it in the root of project folder
@@ -120,13 +115,20 @@ python3 migrate_photo.py --host "https://my-flickr-to-google-photos-XXXX.onrende
    app.google.clientId=123456789012-abcd3ef45g6h70ijkl89m0n1o2pqrstu.apps.googleusercontent.com
    app.google.clientSecret=12Ab3CDe4FGhIjklMnopQRST
    ```
-   - Add the photo folder. Put the path from step 2.
+4. (Optional) By default Flickr photos will be downloaded to `/tmp` and then uploaded to Google Photos. After uploading thie file will be deleted from `/tmp`. If you want to keep all photos to backup them to some other storage, you can create a folder (`/Users/dev/photos_from_flickr` as example) and add properties.
    ```
+   app.deleteLocalFile=false
    app.photoFolder=/Users/dev/photos_from_flickr
    ```
 5. In the project folder launch application.
+   - For local deployment.
    ```
    ./mvnw spring-boot:run
+   ```
+   - To build and run docker containser (set `KEYSTORE_PATH` to your keystore file).
+   ```
+   docker build -f Dockerfile -t my/flickr-to-google-photos --build-arg KEYSTORE_PATH=./my_dev.p12 . --no-cache
+   docker run -d -p 8443:8443 --mount source=db,target=/db my/flickr-to-google-photos 
    ```
 ## Quick start
 Script to migrate all photos and albums
