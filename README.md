@@ -38,27 +38,30 @@ This project implements the following features to achieve migration from Flickr 
    - Description
    - Cover photo
 4. Optionally force create unique photo in Google Photos by modifying photo's EXIF.
-5. Support video migration with limitations.
+5. Support video migration with limitations.  
+
+You can deploy this project to local JVM-ready environment. This project also provides Dockerfile to be built and run in docker container. You can easily dpeloy this project to [Render](https://render.com/).
 
 ## Build with
 - Java 8
 - [Spring Boot](https://spring.io/projects/spring-boot)
 - Maven
-- [H2 Database](https://www.h2database.com)
+- [H2 Database](https://www.h2database.com) or [PostgreSQL](https://www.postgresql.org/)
 - [Flickr4Java](https://github.com/boncey/Flickr4Java)
 - [google-photos-library-client](https://github.com/google/java-photoslibrary) [guide](https://developers.google.com/photos/library/guides/get-started-java#get-library)
 - [Apache Commons Imaging](https://github.com/apache/commons-imaging)
-- Python 2 or 3 and PIP (Optional for migration script only)
+- (Optional) Python3 and PIP3 for migration script
+- (Optional) [Docker Desktop](https://www.docker.com/) for Dokcer deployment
 
 ## Prerequisites
-- JDK 1.8+ and Maven 3.3+ installed
 - Your own Flickr app credential
   1. Create an app with any name in https://www.flickr.com/services/apps/create/noncommercial. After submitting, you will get **key** and **secret**.
   2. Click **Edit auth flow for this app** and update **Callback URL** with `https://localhost:8443/flickr/auth/complete`. 
 - Your own Google App credential
   1. Create or config your Google project with Google Photos Library API. You can find more detailed instructions in https://developers.google.com/photos/library/guides/get-started.
   2. Update **Authorized redirect URI** with `https://localhost:8443/google/auth/complete`.
-- Generate a self-signed SSL certificate (if you don't have a real SSL Certificate).  
+- JDK 1.8+ and Maven 3.3+ installed if you will develop and deploy in the local environment.
+- Generate a self-signed SSL certificate if you don't have a real SSL Certificate. Skip it if you want to deploy to Redner since Render provides fully managed SSL certificate.   
   Flickr oauth callback requires HTTPS URL. To enable HTTPS in Spring Boot we need an SSL certificate. If you don't have one, you can generate a self-signed SSL certificate. Of course it can only be used in local deployment.
   
   ```
@@ -67,8 +70,16 @@ This project implements the following features to achieve migration from Flickr 
   
   This command will ask you input password (`my_password` as my example) and some other information (you can skip all of them except password) and generate `my_dev.p12`, which is your keystore file. This keystore file and password will be used when configuring project's application properties. You can find more informatin in https://www.baeldung.com/spring-boot-https-self-signed-certificate.
  
+## Setup (Render)
+You can deploy flickr-to-google-photos to [Render](https://render.com/) with one click. Render is a platform-as-a-service provider with clear and easy-to-use UI. After clicking the button, Render will clone this repository, build and deploy base on [Dockerfile.render](Dockerfile.render) and [render.yaml](render.yaml) which describes server and PostgreSQL configuration.
 
-## Setup
+[![Deploy to Render](http://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
+
+
+
+## Setup (Local or Docker)
+
 1. Clone this project to local. Go to the project folder.
    ```
    git clone git@github.com:haojiwu/flickr-to-google-photos.git
