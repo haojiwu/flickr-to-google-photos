@@ -8,4 +8,4 @@ FROM openjdk:8-jre
 WORKDIR /app
 COPY --from=MAVEN_BUILD /build/target/flickr-to-google-photos-0.0.1-SNAPSHOT.jar ./app.jar
 COPY $KEYSTORE_PATH ./
-CMD ["java", "-Dspring.profiles.active=local", "-jar", "./app.jar"]
+CMD ["java", "-Dspring.profiles.active=docker", "-jar", "./app.jar"]
