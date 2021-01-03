@@ -80,7 +80,7 @@ Render will prompt to request you to enter `FLICKR_KEY` and `FLICKR_SECRET` from
 
 ![Render YAML environment variables](images/render_yaml_env_var.png)
 
-It is all set. In the new created `my-flickr-to-google-photos-XXXX (XXXX is random string)` web service there will be URL like `https://my-flickr-to-google-photos-XXXX.onrender.com`. This is API endpoint you can use to do Flickr and Google authorization and migrate photos and albumes. Remember to update **Callback URL** in your Flickr app and **Authorized redirect URI** in your Google App with this API endpoint.
+It is all set. In the new created `my-flickr-to-google-photos-XXXX (XXXX is random string)` web service there will be URL like `https://my-flickr-to-google-photos-XXXX.onrender.com`. This is API host you can use to do Flickr and Google authorization and migrate photos and albumes. Remember to update **Callback URL** in your Flickr app and **Authorized redirect URI** in your Google App with this API endpoint.
 
 [Dockerfile.render](Dockerfile.render) contains python and PostgreSQL client. You can execute migration script in this service's web shell:
 ```
@@ -127,14 +127,14 @@ python3 migrate_photo.py --host "https://my-flickr-to-google-photos-XXXX.onrende
    docker run -d -p 8443:8443 --mount source=db,target=/db my/flickr-to-google-photos 
    ```
 ## Quick start
-API endpoint
+API host
 - Local: `https://localhost:8443`
 - Docker: `https://localhost:8443`
 - Render: `https://my-flickr-to-google-photos-XXXX.onrender.com`, which can be found from your Render web service page.
 
 Script to migrate all photos and albums
-1. Open browser to visit `<API endpoint>/flickr/auth`. After authorization flow you will have Flickr credential.
-2. Open browser to visit `<API endpoint>/google/auth`. After authorization flow you will have Google credential.
+1. Open browser to visit `<API host>/flickr/auth`. After authorization flow you will have Flickr credential.
+2. Open browser to visit `<API host>/google/auth`. After authorization flow you will have Google credential.
 3. Make sure your environment has python and [PIP](https://pip.pypa.io/en/stable/).
 4. Install python library `Requests`.
    ```
@@ -142,23 +142,23 @@ Script to migrate all photos and albums
    ```
 5. Execute script to migrate photos. Use Google credential and Flickr credential from step 1 and 2.
    ```
-   python3 migrate_photo.py --host "<API endpoint>" --flickr-token "12345678901234567-1234abc5d6e7890f" --flickr-secret "1fa234b56c78de90" --flickr-user-id "12345678@N00" --google-refresh-token "1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"
+   python3 migrate_photo.py --host "<API host>" --flickr-token "12345678901234567-1234abc5d6e7890f" --flickr-secret "1fa234b56c78de90" --flickr-user-id "12345678@N00" --google-refresh-token "1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"
    ```
 6. Execute script to migrate albums. Use Google credential and Flickr credential from step 1 and 2.
    ```
-   python3 migrate_album.py --host "<API endpoint>" --flickr-token "12345678901234567-1234abc5d6e7890f" --flickr-secret "1fa234b56c78de90" --flickr-user-id "12345678@N00" --google-refresh-token "1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"
+   python3 migrate_album.py --host "<API host>" --flickr-token "12345678901234567-1234abc5d6e7890f" --flickr-secret "1fa234b56c78de90" --flickr-user-id "12345678@N00" --google-refresh-token "1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"
    ```
 
 ## Usage
-API endpoint
+API host
 - Local: `https://localhost:8443`
 - Docker: `https://localhost:8443`
 - Render: `https://my-flickr-to-google-photos-XXXX.onrender.com`, which can be found from your Render web service page.
 
 ### Get Flickr credential
-1. Open browser to visit `<API endpoint>/flickr/auth`.
+1. Open browser to visit `<API host>/flickr/auth`.
 2. Browser will be redirected to the Flickr authorization page.
-3. After you accept it, the browser will be redirected back to `<API endpoint>/flickr/auth/complete` and return `FlickrCredential` which contains `userId`, `token` and `secret`.
+3. After you accept it, the browser will be redirected back to `<API host>/flickr/auth/complete` and return `FlickrCredential` which contains `userId`, `token` and `secret`.
    ```
    {
        "userId": "12345678@N00",
@@ -167,9 +167,9 @@ API endpoint
    }
    ```
 ### Get Google credential
-1. Open browser to visit `<API endpoint>/google/auth`.
+1. Open browser to visit `<API host>/google/auth`.
 2. Browser will be redirected to Google authorization page. There may be a warning like `This app isn't verified`. Ignore it by clicking `Advanced` and `Go to` your app.
-3. After you allow authorization with permissions, the browser will be redirected back to `<API endpoint>/google/auth/complete` and return `GoogleCredential` which contains `accessToken` and `refreshToken`. We only need `refreshToken`.
+3. After you allow authorization with permissions, the browser will be redirected back to `<API host>/google/auth/complete` and return `GoogleCredential` which contains `accessToken` and `refreshToken`. We only need `refreshToken`.
    ```
    {
        "accessToken": "ya12.a3AfH4SMCPonW5F6VHAH7L_oGsb0NwTgDCQQElPrG-8H90flJatx1RELxHPf12ydBKSwi-WH34mHh56jJFU7z89bayrvogNX-Z0PEdmM1gLMQWGfLW23yqbCStvsYp4gcJ5n6cox_nVc7rfGan8SfRiSwtqhg9Kik0Szo",
@@ -177,7 +177,7 @@ API endpoint
    }
    ```
 ### Get Flickr photos metadata with download URL
-- Endpoint: `<API endpoint>/flickr/photo`
+- Endpoint: `<API host>/flickr/photo`
 - Method: GET
 - Parameters:
   - `token`: Flickr token from Flickr credential.
@@ -188,7 +188,7 @@ API endpoint
   # secret: 1fa234b56c78de90
   # page: 1
   # add "-k" to ignore SSL verification 
-  curl -k -X GET "<API endpoint>/flickr/photo?token=12345678901234567-1234abc5d6e7890f&secret=1fa234b56c78de90&page=1"
+  curl -k -X GET "<API host>/flickr/photo?token=12345678901234567-1234abc5d6e7890f&secret=1fa234b56c78de90&page=1"
   {
       "flickrPhotos": [ # Array of Flickr photos. If this is not last page, the array will have 500 elements.
           {
@@ -214,7 +214,7 @@ API endpoint
   }        
   ```
 ### Create photo entities in Google Photos
-- Endpoint: `<API endpoint>/google/photo`
+- Endpoint: `<API host>/google/photo`
 - Method: POST
 - Parameters:
   - `refreshToken`: Google refresh token token from Google credential.
@@ -223,7 +223,7 @@ API endpoint
   ```bash
   #refreshToken: 1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza
   curl -k -X POST \
-    '<API endpoint>/google/photo?refreshToken=1%2F%2F23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza \
+    '<API host>/google/photo?refreshToken=1%2F%2F23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza \
     -H 'content-type: application/json' \
     -d '[
           {
@@ -279,7 +279,7 @@ API endpoint
 - This photo is added to the album `Photos from Flickr` which is also created by our app.
 
 ### Get Flickr albums metadata with photo associations
-- Endpoint: `<API endpoint>/flickr/album`
+- Endpoint: `<API host>/flickr/album`
 - Method: GET
 - Parameters:
   - `token`: Flickr token from Flickr credential.
@@ -292,7 +292,7 @@ API endpoint
   # secret: 1fa234b56c78de90
   # userId: 12345678@N00
   # page: 1
-  curl -k -X GET "<API endpoint>/flickr/album?token=12345678901234567-1234abc5d6e7890f&secret=1fa234b56c78de90&userId=12345678%40N00&page=1"
+  curl -k -X GET "<API host>/flickr/album?token=12345678901234567-1234abc5d6e7890f&secret=1fa234b56c78de90&userId=12345678%40N00&page=1"
   {
       "flickrAlbums": [ # Array of Flickr albums.
           {
@@ -316,7 +316,7 @@ API endpoint
   }        
   ```
 ### Create album in Google Photos
-- Endpoint: `<API endpoint>/google/album`
+- Endpoint: `<API host>/google/album`
 - Method: POST
 - Parameters:
   - `refreshToken`: Google refresh token token from Google credential.
@@ -324,7 +324,7 @@ API endpoint
   ```bash
   #refreshToken: 1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza
   curl -k -X POST \
-    'https://localhost:8443/google/album?refreshToken=1%2F%2F23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza \
+    '<API host>/google/album?refreshToken=1%2F%2F23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza \
     -H 'content-type: application/json' \
     -d '{
               "id": "12345678901234567", 
