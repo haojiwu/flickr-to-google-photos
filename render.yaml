@@ -7,7 +7,7 @@ services:
    name: my-flickr-to-google-photos
    env: docker
    dockerfilePath: ./Dockerfile.render
-   autoDeploy: true
+   autoDeploy: false
    envVars:
      - key: DB_HOST
        fromDatabase:
