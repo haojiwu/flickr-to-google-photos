@@ -83,12 +83,12 @@ Render will prompt to request you to enter `FLICKR_KEY` and `FLICKR_SECRET` from
 It is all set. In the new created `my-flickr-to-google-photos-XXXX (XXXX is random string)` web service there will be URL like `https://my-flickr-to-google-photos-XXXX.onrender.com`. This is API endpoint you can use to do Flickr and Google authorization and migrate photos and albumes. Remember to update **Callback URL** in your Flickr app and **Authorized redirect URI** in your Google App with this API endpoint.
 
 [Dockerfile.render](Dockerfile.render) contains python and PostgreSQL client. You can execute migration script in this service's web shell:
-
-![Render web shell](images/render_web_shell.png)
-
 ```
 python3 migrate_photo.py --host "https://my-flickr-to-google-photos-XXXX.onrender.com" --flickr-token "12345678901234567-1234abc5d6e7890f" --flickr-secret "1fa234b56c78de90" --flickr-user-id "12345678@N00" --google-refresh-token "1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"
 ```
+
+![Render web shell](images/render_web_shell.png)
+
 
 
 ## Setup (Local or Docker)
@@ -156,7 +156,7 @@ API endpoint
 - Render: `https://my-flickr-to-google-photos-XXXX.onrender.com`, which can be found from your Render web service page.
 
 ### Get Flickr credential
-1. Open browser to visit <API endpoint>/flickr/auth`.
+1. Open browser to visit `<API endpoint>/flickr/auth`.
 2. Browser will be redirected to the Flickr authorization page.
 3. After you accept it, the browser will be redirected back to `<API endpoint>/flickr/auth/complete` and return `FlickrCredential` which contains `userId`, `token` and `secret`.
    ```
