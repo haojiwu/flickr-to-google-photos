@@ -9,7 +9,8 @@ Example:
   * [Description](#description)
   * [Build with](#build-with)
   * [Prerequisites](#prerequisites)
-  * [Setup](#setup)
+  * [Setup (Render)](#setup-render)
+  * [Setup (Local or Docker)](#setup-local-or-docker)
   * [Quick start](#quick-start)
   * [Usage](#usage)
      * [Get Flickr credential](#get-flickr-credential)
@@ -71,7 +72,7 @@ You can deploy this project to local JVM-ready environment. This project also pr
   This command will ask you input password (`my_password` as my example) and some other information (you can skip all of them except password) and generate `my_dev.p12`, which is your keystore file. This keystore file and password will be used when configuring project's application properties. You can find more informatin in https://www.baeldung.com/spring-boot-https-self-signed-certificate.
  
 ## Setup (Render)
-You can deploy flickr-to-google-photos to [Render](https://render.com/) with one click. Render is a platform-as-a-service provider with clear and easy-to-use UI. After clicking the button, Render will clone this repository, build and deploy base on [Dockerfile.render](Dockerfile.render) and [render.yaml](render.yaml) which describes web service and PostgreSQL database configuration.
+You can deploy this project to [Render](https://render.com/) with one click. Render is a platform-as-a-service provider with clear and easy-to-use UI. After clicking the button, Render will clone this repository, build and deploy base on [Dockerfile.render](Dockerfile.render) and [render.yaml](render.yaml) which describes web service and PostgreSQL database configuration.
 
 [![Deploy to Render](http://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
@@ -115,12 +116,7 @@ python3 migrate_photo.py --host "https://my-flickr-to-google-photos-XXXX.onrende
    app.google.clientId=123456789012-abcd3ef45g6h70ijkl89m0n1o2pqrstu.apps.googleusercontent.com
    app.google.clientSecret=12Ab3CDe4FGhIjklMnopQRST
    ```
-4. (Optional) By default Flickr photos will be downloaded to `/tmp` and then uploaded to Google Photos. After uploading thie file will be deleted from `/tmp`. If you want to keep all photos to backup them to some other storage, you can create a folder (`/Users/dev/photos_from_flickr` as example) and add properties.
-   ```
-   app.deleteLocalFile=false
-   app.photoFolder=/Users/dev/photos_from_flickr
-   ```
-5. In the project folder launch application.
+4. In the project folder launch application.
    - For local deployment.
    ```
    ./mvnw spring-boot:run
@@ -131,36 +127,38 @@ python3 migrate_photo.py --host "https://my-flickr-to-google-photos-XXXX.onrende
    docker run -d -p 8443:8443 --mount source=db,target=/db my/flickr-to-google-photos 
    ```
 ## Quick start
+API endpoint
+- Local: `https://localhost:8443`
+- Docker: `https://localhost:8443`
+- Render: `https://my-flickr-to-google-photos-XXXX.onrender.com`, which can be found from your Render web service page.
+
 Script to migrate all photos and albums
-1. Open browser to visit `https://localhost:8443/flickr/auth`. After authorization flow you will have Flickr credential.
-2. Open browser to visit `https://localhost:8443/google/auth`. After authorization flow you will have Google credential.
+1. Open browser to visit `<API endpoint>/flickr/auth`. After authorization flow you will have Flickr credential.
+2. Open browser to visit `<API endpoint>/google/auth`. After authorization flow you will have Google credential.
 3. Make sure your environment has python and [PIP](https://pip.pypa.io/en/stable/).
 4. Install python library `Requests`.
    ```
-   pip install requests
+   pip3 install requests
    ```
-5. Edit `migrate_photo.py` and `migrate_album.py` in the project folder to add Google credential and Flickr credential.
+5. Execute script to migrate photos. Use Google credential and Flickr credential from step 1 and 2.
    ```
-   flickr_token = "12345678901234567-1234abc5d6e7890f"
-   flickr_secret = "1fa234b56c78de90"
-   flickr_user_id = "12345678@N00"
-   google_refresh_token = "1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"
+   python3 migrate_photo.py --host "<API endpoint>" --flickr-token "12345678901234567-1234abc5d6e7890f" --flickr-secret "1fa234b56c78de90" --flickr-user-id "12345678@N00" --google-refresh-token "1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"
    ```
-6. Execute script to migrate photos.
+6. Execute script to migrate albums. Use Google credential and Flickr credential from step 1 and 2.
    ```
-   python migrate_photo.py
-   ```
-7. Execute script to migrate albums.
-   ```
-   python migrate_album.py
+   python3 migrate_album.py --host "<API endpoint>" --flickr-token "12345678901234567-1234abc5d6e7890f" --flickr-secret "1fa234b56c78de90" --flickr-user-id "12345678@N00" --google-refresh-token "1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"
    ```
 
 ## Usage
+API endpoint
+- Local: `https://localhost:8443`
+- Docker: `https://localhost:8443`
+- Render: `https://my-flickr-to-google-photos-XXXX.onrender.com`, which can be found from your Render web service page.
 
 ### Get Flickr credential
-1. Open browser to visit `https://localhost:8443/flickr/auth`.
+1. Open browser to visit <API endpoint>/flickr/auth`.
 2. Browser will be redirected to the Flickr authorization page.
-3. After you accept it, the browser will be redirected back to `https://localhost:8443/flickr/auth/complete` and return `FlickrCredential` which contains `userId`, `token` and `secret`.
+3. After you accept it, the browser will be redirected back to `<API endpoint>/flickr/auth/complete` and return `FlickrCredential` which contains `userId`, `token` and `secret`.
    ```
    {
        "userId": "12345678@N00",
@@ -169,9 +167,9 @@ Script to migrate all photos and albums
    }
    ```
 ### Get Google credential
-1. Open browser to visit `https://localhost:8443/google/auth`.
+1. Open browser to visit `<API endpoint>/google/auth`.
 2. Browser will be redirected to Google authorization page. There may be a warning like `This app isn't verified`. Ignore it by clicking `Advanced` and `Go to` your app.
-3. After you allow authorization with permissions, the browser will be redirected back to `https://localhost:8443/google/auth/complete` and return `GoogleCredential` which contains `accessToken` and `refreshToken`. We only need `refreshToken`.
+3. After you allow authorization with permissions, the browser will be redirected back to `<API endpoint>/google/auth/complete` and return `GoogleCredential` which contains `accessToken` and `refreshToken`. We only need `refreshToken`.
    ```
    {
        "accessToken": "ya12.a3AfH4SMCPonW5F6VHAH7L_oGsb0NwTgDCQQElPrG-8H90flJatx1RELxHPf12ydBKSwi-WH34mHh56jJFU7z89bayrvogNX-Z0PEdmM1gLMQWGfLW23yqbCStvsYp4gcJ5n6cox_nVc7rfGan8SfRiSwtqhg9Kik0Szo",
@@ -179,7 +177,7 @@ Script to migrate all photos and albums
    }
    ```
 ### Get Flickr photos metadata with download URL
-- Endpoint: `https://localhost:8443/flickr/photo`
+- Endpoint: `<API endpoint>/flickr/photo`
 - Method: GET
 - Parameters:
   - `token`: Flickr token from Flickr credential.
@@ -190,7 +188,7 @@ Script to migrate all photos and albums
   # secret: 1fa234b56c78de90
   # page: 1
   # add "-k" to ignore SSL verification 
-  curl -k -X GET "https://localhost:8443/flickr/photo?token=12345678901234567-1234abc5d6e7890f&secret=1fa234b56c78de90&page=1"
+  curl -k -X GET "<API endpoint>/flickr/photo?token=12345678901234567-1234abc5d6e7890f&secret=1fa234b56c78de90&page=1"
   {
       "flickrPhotos": [ # Array of Flickr photos. If this is not last page, the array will have 500 elements.
           {
@@ -216,7 +214,7 @@ Script to migrate all photos and albums
   }        
   ```
 ### Create photo entities in Google Photos
-- Endpoint: `https://localhost:8443/google/photo`
+- Endpoint: `<API endpoint>/google/photo`
 - Method: POST
 - Parameters:
   - `refreshToken`: Google refresh token token from Google credential.
@@ -225,7 +223,7 @@ Script to migrate all photos and albums
   ```bash
   #refreshToken: 1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza
   curl -k -X POST \
-    'https://localhost:8443/google/photo?refreshToken=1%2F%2F23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza \
+    '<API endpoint>/google/photo?refreshToken=1%2F%2F23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza \
     -H 'content-type: application/json' \
     -d '[
           {
@@ -281,7 +279,7 @@ Script to migrate all photos and albums
 - This photo is added to the album `Photos from Flickr` which is also created by our app.
 
 ### Get Flickr albums metadata with photo associations
-- Endpoint: `https://localhost:8443/flickr/album`
+- Endpoint: `<API endpoint>/flickr/album`
 - Method: GET
 - Parameters:
   - `token`: Flickr token from Flickr credential.
@@ -294,7 +292,7 @@ Script to migrate all photos and albums
   # secret: 1fa234b56c78de90
   # userId: 12345678@N00
   # page: 1
-  curl -k -X GET "https://localhost:8443/flickr/album?token=12345678901234567-1234abc5d6e7890f&secret=1fa234b56c78de90&userId=12345678%40N00&page=1"
+  curl -k -X GET "<API endpoint>/flickr/album?token=12345678901234567-1234abc5d6e7890f&secret=1fa234b56c78de90&userId=12345678%40N00&page=1"
   {
       "flickrAlbums": [ # Array of Flickr albums.
           {
@@ -318,7 +316,7 @@ Script to migrate all photos and albums
   }        
   ```
 ### Create album in Google Photos
-- Endpoint: `https://localhost:8443/google/album`
+- Endpoint: `<API endpoint>/google/album`
 - Method: POST
 - Parameters:
   - `refreshToken`: Google refresh token token from Google credential.
@@ -385,8 +383,13 @@ After the application process starts, `myh2db.mv.db` will be created.
 Google API sets a quota to limit the number of write API calls per minute. Our application leverages [Sptring Retry](https://www.baeldung.com/spring-retry) with exponential backoff starting from 30 seconds. It makes this API sometimes very slow if retry happens a lot.
 
 ### Local Photos
-- Flickr photos will be downloaded and stored in the folder you specified in `app.photoFolder` in the application properties. If this file's EXIF is modified by our application, either adding geotagging or UserComment, a new file will be created with suffix `_taggeed` in filename.
-- Since our application doesn't clean photo files, make sure your local disk has enough free space when you start to migrate a lot of photos.
+- By default Flickr photos will be downloaded to `/tmp` and then uploaded to Google Photos. After uploading these files will be deleted from `/tmp`. If you want to keep all photos to backup them to some other storage, you can create a folder (`/Users/dev/photos_from_flickr` as example) and update application properties.
+   ```
+   app.deleteLocalFile=false
+   app.photoFolder=/Users/dev/photos_from_flickr
+   ```
+   Make sure your local disk has enough free space when you start to migrate a lot of photos.
+- If this Flickr photo file's EXIF is modified by our application, either adding geotagging or UserComment, a new file will be created with suffix `_taggeed` in filename.
 
 ## Feedback
 Any feedback or bug report are welcome. For more information about this project please check my blog https://haojiwu.wordpress.com/category/flickr-to-google-photos/.
