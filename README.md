@@ -61,7 +61,7 @@ You can deploy this project to local JVM-ready environment. This project also pr
   1. Create or config your Google project with Google Photos Library API. You can find more detailed instructions in https://developers.google.com/photos/library/guides/get-started.
   2. Update **Authorized redirect URI** with `https://localhost:8443/google/auth/complete`.
 - JDK 1.8+ and Maven 3.3+ installed if you will develop and deploy in the local environment.
-- Generate a self-signed SSL certificate if you don't have a real SSL Certificate. Skip it if you want to deploy to Redner since Render provides fully managed SSL certificate.   
+- Generate a self-signed SSL certificate if you don't have a real SSL Certificate. Skip it if you want to deploy to [Render](https://render.com/) since Render provides fully managed SSL certificate.   
   Flickr oauth callback requires HTTPS URL. To enable HTTPS in Spring Boot we need an SSL certificate. If you don't have one, you can generate a self-signed SSL certificate. Of course it can only be used in local deployment.
   
   ```
@@ -71,11 +71,20 @@ You can deploy this project to local JVM-ready environment. This project also pr
   This command will ask you input password (`my_password` as my example) and some other information (you can skip all of them except password) and generate `my_dev.p12`, which is your keystore file. This keystore file and password will be used when configuring project's application properties. You can find more informatin in https://www.baeldung.com/spring-boot-https-self-signed-certificate.
  
 ## Setup (Render)
-You can deploy flickr-to-google-photos to [Render](https://render.com/) with one click. Render is a platform-as-a-service provider with clear and easy-to-use UI. After clicking the button, Render will clone this repository, build and deploy base on [Dockerfile.render](Dockerfile.render) and [render.yaml](render.yaml) which describes server and PostgreSQL configuration.
+You can deploy flickr-to-google-photos to [Render](https://render.com/) with one click. Render is a platform-as-a-service provider with clear and easy-to-use UI. After clicking the button, Render will clone this repository, build and deploy base on [Dockerfile.render](Dockerfile.render) and [render.yaml](render.yaml) which describes web service and PostgreSQL database configuration.
 
 [![Deploy to Render](http://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
+Render will prompt to request you to enter `FLICKR_KEY` and `FLICKR_SECRET` from your Flickr app and `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from your Google app as environment variables. 
+![Render YAML environment variables](images/render_yaml_env_var.png)
 
+It is all set. In the new created `my-flickr-to-google-photos-XXXX (XXXX is random string)` web service there will be URL like `https://my-flickr-to-google-photos-XXXX.onrender.com`. This is API endpoint you can use to do Flickr and Google authorization and migrate photos and albumes. Remember to update **Callback URL** in your Flickr app and **Authorized redirect URI** in your Google App with this API endpoint.
+
+[Dockerfile.render](Dockerfile.render) contains python and PostgreSQL client. You can execute migration script in this service's web shell:
+![Render web shell](images/render_web_shell.png)
+```
+python3 migrate_photo.py --host "https://my-flickr-to-google-photos-XXXX.onrender.com" --flickr-token "12345678901234567-1234abc5d6e7890f" --flickr-secret "1fa234b56c78de90" --flickr-user-id "12345678@N00" --google-refresh-token "1//23-4a5BCD6Ef7GhIJKLMNOPQRStU-V8Wx9y0zaBCd12Efg3HiJKlMnoPQ_rStU4vWx1YZabc5DefgH6iJk7LmNOPQr8stUvwxyza"
+```
 
 
 ## Setup (Local or Docker)
