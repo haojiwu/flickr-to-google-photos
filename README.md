@@ -55,10 +55,10 @@ You can deploy this project to local JVM-ready environment. This project also pr
 - (Optional) [Docker Desktop](https://www.docker.com/) for Dokcer deployment
 
 ## Prerequisites
-- Your own Flickr app credential
+- Your own Flickr app with key and secret
   1. Create an app with any name in https://www.flickr.com/services/apps/create/noncommercial. After submitting, you will get **key** and **secret**.
   2. Click **Edit auth flow for this app** and update **Callback URL** with `https://localhost:8443/flickr/auth/complete`. 
-- Your own Google App credential
+- Your own Google app with client id and client secret
   1. Create or config your Google project with Google Photos Library API. You can find more detailed instructions in https://developers.google.com/photos/library/guides/get-started.
   2. Update **Authorized redirect URI** with `https://localhost:8443/google/auth/complete`.
 - JDK 1.8+ and Maven 3.3+ installed if you will develop and deploy in the local environment.
@@ -80,7 +80,7 @@ Render will prompt to request you to enter `FLICKR_KEY` and `FLICKR_SECRET` from
 
 ![Render YAML environment variables](images/render_yaml_env_var.png)
 
-It is all set. In the new created `my-flickr-to-google-photos-XXXX (XXXX is random string)` web service there will be URL like `https://my-flickr-to-google-photos-XXXX.onrender.com`. This is API host you can use to do Flickr and Google authorization and migrate photos and albumes. Remember to update **Callback URL** in your Flickr app and **Authorized redirect URI** in your Google App with this API endpoint.
+It is all set. In the new created `my-flickr-to-google-photos-XXXX (XXXX is random string)` web service there will be URL like `https://my-flickr-to-google-photos-XXXX.onrender.com`. This is API host you can use to do Flickr and Google authorization and migrate photos and albumes. Remember to update **Callback URL** in your Flickr app and **Authorized redirect URI** in your Google app with this API host.
 
 [Dockerfile.render](Dockerfile.render) contains python and PostgreSQL client. You can execute migration script in this service's web shell:
 ```
@@ -98,7 +98,7 @@ python3 migrate_photo.py --host "https://my-flickr-to-google-photos-XXXX.onrende
    git clone git@github.com:haojiwu/flickr-to-google-photos.git
    cd flickr-to-google-photos
    ```
-2. Copy keystore (`my_dev.p12` in previous example) to the project folder.
+2. Copy SSL keystore (`my_dev.p12` in previous example) to the project folder.
 3. Configure project's application properties in `src/main/resources/application-dev.properties` or `src/main/resources/application-docker.properties`.
    - Add SSL properties.
    ```
@@ -106,7 +106,7 @@ python3 migrate_photo.py --host "https://my-flickr-to-google-photos-XXXX.onrende
    server.ssl.key-store-password=my_password  # the value you entered when keytool asked 
    server.ssl.key-alias=my_dev
    ```
-   - Add the Flickr key and secret, which are from the Flickr App you created.
+   - Add the Flickr key and secret, which are from the Flickr app you created.
    ```
    app.flickr.key=a1b234567b89c012d3e4f5ab67c8901d
    app.flickr.secret=12ab345c6d789e0f
@@ -121,7 +121,7 @@ python3 migrate_photo.py --host "https://my-flickr-to-google-photos-XXXX.onrende
    ```
    ./mvnw spring-boot:run
    ```
-   - To build and run docker containser (set `KEYSTORE_PATH` to your keystore file).
+   - To build and run docker container (set `KEYSTORE_PATH` to your keystore file).
    ```
    docker build -f Dockerfile -t my/flickr-to-google-photos --build-arg KEYSTORE_PATH=./my_dev.p12 . --no-cache
    docker run -d -p 8443:8443 --mount source=db,target=/db my/flickr-to-google-photos 
@@ -132,7 +132,7 @@ API host
 - Docker: `https://localhost:8443`
 - Render: `https://my-flickr-to-google-photos-XXXX.onrender.com`, which can be found from your Render web service page.
 
-Script to migrate all photos and albums
+Use script to migrate all photos and albums
 1. Open browser to visit `<API host>/flickr/auth`. After authorization flow you will have Flickr credential.
 2. Open browser to visit `<API host>/google/auth`. After authorization flow you will have Google credential.
 3. Make sure your environment has python and [PIP](https://pip.pypa.io/en/stable/).
@@ -372,6 +372,7 @@ Besides photos, our application also migrates videos from Flickr to Google Photo
 ### Database
 This project use H2 database (in memory or disk) or PostgreSQL database to store id mappings between Flickr and Google Photos.
 - H2 database
+
   H2 can be accessed by visiting `https://localhost:8443/h2-console/`. By default H2 is only in memory and will be reset after the application process restart. To persist id mapping, you can add these config in `application-dev.properties`.
   ```
   spring.datasource.url=jdbc:h2:file:/you/local/path/myh2db
@@ -381,13 +382,30 @@ This project use H2 database (in memory or disk) or PostgreSQL database to store
   For docker deployment it needs to mount volume as persistent disk. In the `application-docker.properties` H2 file path is `/db/myh2db`. Docker container will mount `/db` with this argument `--mount source=db,target=/db`
   
 - PostgreSQL database
-  For Render deployment this project uses PostgreSQL since Render provides fully managed PostgreSQL.
+
+  For Render deployment this project uses PostgreSQL since Render provides fully managed PostgreSQL. These are config in `application-render.properties`.
+  ```
+  spring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/${DB_NAME}
+  spring.datasource.username=${DB_USERNAME}
+  spring.datasource.password=${DB_PASSWORD}
+  spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+  spring.jpa.hibernate.ddl-auto=update
+  ```
+  Since the docker file contains PostgreSQL client, you can query id mapping table in Render web shell.
+  ```
+  #psql postgres://my_flickr_to_google_photos_db_XXXX_user:<DB_PASSWORD>@dpg-abcDefghi1j2k34lmnop/my_flickr_to_google_photos_db_XXXX
+  my_flickr_to_google_photos_db_XXXX=> select * from id_mapping;
+  source_id | user_id | target_id 
+  -----------+---------+-----------
+  (0 rows)
+  ```
+  `dpg-abcDefghi1j2k34lmnop` is database id in Render. You can find whole DB connection string in Render Database's `Internal Connection String`.
 
 ### Performance
 Google API sets a quota to limit the number of write API calls per minute. Our application leverages [Sptring Retry](https://www.baeldung.com/spring-retry) with exponential backoff starting from 30 seconds. It makes this API sometimes very slow if retry happens a lot.
 
 ### Local Photos
-- By default Flickr photos will be downloaded to `/tmp` and then uploaded to Google Photos. After uploading these files will be deleted from `/tmp`. If you want to keep all photos to backup them to some other storage, you can create a folder (`/Users/dev/photos_from_flickr` as example) and update application properties.
+- By default Flickr photos will be downloaded to `/tmp` and then uploaded to Google Photos. After uploading these files will be deleted from `/tmp`. If you want to keep all photos for other purpose, like backup to other storage, you can create a folder (`/Users/dev/photos_from_flickr` as example) and update application properties.
    ```
    app.deleteLocalFile=false
    app.photoFolder=/Users/dev/photos_from_flickr
