@@ -1,9 +1,11 @@
 databases:
 - name: my-flickr-to-google-photos-db
+  region: frankfurt
   ipAllowList: []
 
 services:
  - type: web
+   region: frankfurt
    name: my-flickr-to-google-photos
    env: docker
    dockerfilePath: ./Dockerfile.render
